@@ -1,6 +1,7 @@
 import React from 'react'
-import { useSettingsStore, PROVIDER_MODELS_LIST, PROVIDER_DEFAULT_URLS } from '../store/store'
-import type { ProviderId } from '../store/store'
+import { useSettingsStore } from '../../store/useSettingsStore'
+import { PROVIDER_MODELS_LIST, PROVIDER_DEFAULT_URLS } from '../../config/providers'
+import type { ProviderId } from '../../config/providers'
 import { Key, Globe, Shield, Eye, EyeOff } from 'lucide-react'
 
 export const SettingsPanel: React.FC = () => {

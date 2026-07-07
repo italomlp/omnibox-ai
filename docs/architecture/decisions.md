@@ -42,8 +42,8 @@ This document outlines the core technical architecture decisions, justifications
 ---
 
 ## 6. Secure BYOK API Router & CORS Abstractions
-* **Decision:** A custom, REST-based `StreamingClient` class making direct `fetch` requests with manual SSE (Server-Sent Events) chunk parsing.
-* **Justification:** Using individual npm SDK packages for OpenAI, Anthropic, Gemini, OpenRouter, and Ollama introduces significant dependency bloat. By implementing a lightweight `StreamingClient` class:
+* **Decision:** A custom, REST-based `streamLLM` utility function composed of modular request building, SSE parsing, and stream execution modules making direct `fetch` requests with manual SSE (Server-Sent Events) chunk parsing.
+* **Justification:** Using individual npm SDK packages for OpenAI, Anthropic, Gemini, OpenRouter, and Ollama introduces significant dependency bloat. By implementing a lightweight modular streaming client under `src/services/streaming/`:
   * We avoid SDK packages entirely, reducing bundle size.
   * We route OpenAI, OpenRouter, and Ollama requests through a single standard code path since they all support the OpenAI-compatible `/v1/chat/completions` API structure.
   * We handle provider-specific CORS limits directly in the client.

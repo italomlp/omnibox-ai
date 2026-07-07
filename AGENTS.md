@@ -14,7 +14,7 @@ This document serves as the developer rules guide and project context anchor. An
 ---
 
 ## 2. API Integrations & Streaming Conventions
-* **Zero SDK Bloat:** Do NOT install SDK npm packages for OpenAI, Anthropic, Gemini, or OpenRouter. All cloud gateways must be called directly via standard browser `fetch` requests inside `src/services/StreamingClient.ts`.
+* **Zero SDK Bloat:** Do NOT install SDK npm packages for OpenAI, Anthropic, Gemini, or OpenRouter. All cloud gateways must be called directly via standard browser `fetch` requests inside the `src/services/streaming/` module.
 * **Server-Sent Events (SSE):** Keep stream handlers highly optimized using the browser's `ReadableStream` reader and `TextDecoder` to avoid UI locking.
 * **Localhost Daemon (Ollama):** Ollama endpoints should use the OpenAI compatibility path at `/v1/chat/completions`. Intercept connection drops to warn about CORS setup requirements.
 * **CORS Restrictions:** Route Anthropic Claude models through OpenRouter by default, or support a custom base/proxy URL from the settings.

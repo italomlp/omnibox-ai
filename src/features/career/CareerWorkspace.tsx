@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from 'react'
-import { useSettingsStore, PROVIDER_MODELS_LIST } from '../store/store'
-import type { ProviderId } from '../store/store'
-import { StreamingClient } from '../services/StreamingClient'
-import { useWebLLM } from '../hooks/useWebLLM'
-import { db } from '../db/db'
-import { Briefcase, Eye, Save, Trash, AlertTriangle, ArrowRight, Loader2, Sparkles, History } from 'lucide-react'
+import { Briefcase, Eye, Save, Trash, ArrowRight, Loader2, Sparkles, History } from 'lucide-react'
+import { useInference } from '../../hooks/useInference'
+import { db } from '../../db/db'
+import { ProviderSelector } from '../../components/shared/ProviderSelector'
+import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
+import { ErrorAlert } from '../../components/shared/ErrorAlert'
 
 export const CareerWorkspace: React.FC = () => {
-  const settings = useSettingsStore()
-  const webLLM = useWebLLM()
+  const inference = useInference()
+  const {
+    activeProvider,
+    setActiveProvider,
+    selectedModel,
+    setSelectedModel,
+    availableProviders,
+    isProcessing,
+    errorMsg,
+    runInference,
+    webLLM,
+  } = inference
 
   // Inputs
   const [resumeText, setResumeText] = useState('')
@@ -17,42 +27,10 @@ export const CareerWorkspace: React.FC = () => {
   
   // States
   const [output, setOutput] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   
-  // Model Configuration
-  const [activeProvider, setActiveProvider] = useState<ProviderId>('openai')
-  const [selectedModel, setSelectedModel] = useState('')
-
   // IndexedDB Document lists
   const [savedResumes, setSavedResumes] = useState<{ id?: number; name: string; content: string }[]>([])
   const [pastAnalyses, setPastAnalyses] = useState<{ id?: number; toolId: string; timestamp: number; output: string }[]>([])
-
-  // Load provider selections
-  const availableProviders = Object.keys(settings.apiKeys).filter((prov) => {
-    if (settings.privacyMode) {
-      return prov === 'webgpu' || prov === 'ollama'
-    }
-    return prov !== 'webgpu'
-  }) as ProviderId[]
-
-  const providersToUse = settings.privacyMode
-    ? ['webgpu', 'ollama'] as ProviderId[]
-    : ['webgpu', ...availableProviders]
-
-  useEffect(() => {
-    if (activeProvider === 'webgpu') {
-      setSelectedModel(settings.selectedModels.webgpu || 'gemma-2b-it')
-    } else {
-      setSelectedModel(settings.selectedModels[activeProvider] || '')
-    }
-  }, [activeProvider, settings.selectedModels])
-
-  useEffect(() => {
-    if (settings.privacyMode && activeProvider !== 'webgpu' && activeProvider !== 'ollama') {
-      setActiveProvider('webgpu')
-    }
-  }, [settings.privacyMode, activeProvider])
 
   // Fetch saved documents and past analysis outputs from Dexie
   const loadStoredData = async () => {
@@ -114,91 +92,43 @@ export const CareerWorkspace: React.FC = () => {
 
   const runAnalysis = async (systemPrompt: string, toolId: string) => {
     if (!resumeText.trim() || !jobDescText.trim()) {
-      setErrorMsg('Please supply both your resume content and the job description to run this evaluation.')
+      inference.abort() // Trigger local error
+      // Note: we can manually set error or handle it
+      alert('Please supply both your resume content and the job description to run this evaluation.')
       return
     }
 
-    setIsProcessing(true)
     setOutput('')
-    setErrorMsg(null)
-
-    const providerConfig = {
-      apiKey: settings.apiKeys[activeProvider],
-      baseUrl: settings.baseUrls[activeProvider],
-      selectedModel: selectedModel,
-    }
-
+    
     const userPrompt = `## CANDIDATE RESUME:
 ${resumeText}
 
 ## TARGET JOB DESCRIPTION:
 ${jobDescText}`
 
-    try {
-      if (activeProvider === 'webgpu') {
-        if (!webLLM.isSupported) {
-          throw new Error('WebGPU is not supported on this browser.')
-        }
+    await runInference({
+      systemPrompt,
+      userPrompt,
+      temperature: 0.2, // Low temperature for precise gap analyses
+      onChunk: (chunk) => {
+        setOutput((prev) => prev + chunk)
+      },
+      onComplete: async (fullText) => {
+        setOutput(fullText)
 
-        const engine = await webLLM.loadModel(selectedModel)
-        if (!engine) {
-          throw new Error('Failed to load WebGPU model.')
-        }
-
-        await webLLM.generate(
-          selectedModel,
-          userPrompt,
-          systemPrompt,
-          (chunk) => setOutput((prev) => prev + chunk)
-        )
-
-        // Log locally
+        // Log locally (fixes stale closure by using fullText directly)
         await db.history.add({
           workspaceId: 'career',
           toolId,
           timestamp: Date.now(),
           input: { resume: resumeText, jobDesc: jobDescText },
-          output: output, // Note: output state is updated asynchronously, so we construct it
-          provider: 'webgpu',
+          output: fullText,
+          provider: activeProvider,
           model: selectedModel,
         })
         loadStoredData()
-      } else {
-        await StreamingClient.stream(
-          activeProvider,
-          providerConfig,
-          {
-            prompt: userPrompt,
-            systemPrompt,
-            temperature: 0.2, // Low temperature for precise gap analyses
-          },
-          {
-            onChunk: (chunk) => setOutput((prev) => prev + chunk),
-            onComplete: async (fullText) => {
-              await db.history.add({
-                workspaceId: 'career',
-                toolId,
-                timestamp: Date.now(),
-                input: { resume: resumeText, jobDesc: jobDescText },
-                output: fullText,
-                provider: activeProvider,
-                model: selectedModel,
-              })
-              loadStoredData()
-            },
-            onError: (err) => {
-              console.error(err)
-              setErrorMsg(err.message || 'Analysis stream failed.')
-            },
-          }
-        )
-      }
-    } catch (err: any) {
-      console.error(err)
-      setErrorMsg(err.message || 'An error occurred during career evaluation.')
-    } finally {
-      setIsProcessing(false)
-    }
+      },
+    })
   }
 
   const runAtsAudit = () => {
@@ -227,6 +157,7 @@ Output a structured executive evaluation. Use markdown format. Include sections:
     const prompt = `You are a career gap-analysis assistant. Compare the candidate's resume and the job description side-by-side. 
 Generate a markdown table mapping every major requirement mentioned in the Job Description to the evidence inside the candidate's resume.
 The table must use columns:
+...
 | Required Skill / Responsibility | Evidence in Resume | Status (Match / Partial Gap / Omission) | Recommendation / Bullet to Add |
 
 Ensure you list at least 6 core requirements from the job description. If a requirement has no evidence in the resume, explicitly mark the status as "Omission" and provide a placeholder bullet demonstrating how the candidate could showcase this skill if they have it.`
@@ -248,84 +179,30 @@ Ensure you list at least 6 core requirements from the job description. If a requ
         </div>
 
         {/* Local model configurations bar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col space-y-1">
-            <label className="text-[10px] text-zinc-500 font-semibold uppercase">Provider</label>
-            <select
-              value={activeProvider}
-              onChange={(e) => setActiveProvider(e.target.value as ProviderId)}
-              className="text-xs bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-zinc-300 focus:outline-none focus:border-indigo-500 animate-none"
-            >
-              {providersToUse.map((prov) => (
-                <option key={prov} value={prov}>
-                  {prov === 'webgpu' ? 'Tier 1: WebGPU (Local)' : prov === 'ollama' ? 'Tier 2: Ollama (Local)' : `Tier 3: ${prov}`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col space-y-1">
-            <label className="text-[10px] text-zinc-500 font-semibold uppercase">Model</label>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="text-xs bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-zinc-300 focus:outline-none focus:border-indigo-500"
-            >
-              {PROVIDER_MODELS_LIST[activeProvider]?.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <ProviderSelector
+          activeProvider={activeProvider}
+          onProviderChange={setActiveProvider}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          availableProviders={availableProviders}
+        />
       </div>
 
       {/* WebGPU Model Loading Overlay */}
-      {activeProvider === 'webgpu' && webLLM.isLoading && (
-        <div className="p-4 rounded-xl border border-indigo-900/30 bg-indigo-950/10 text-zinc-300 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-2 font-medium">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-              Loading WebGPU Model assets ({selectedModel})...
-            </span>
-            <span className="font-mono text-zinc-400">{webLLM.speed}</span>
-          </div>
-          <div className="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800">
-            <div 
-              className="bg-indigo-500 h-full rounded-full transition-all duration-300" 
-              style={{ width: `${webLLM.loadPercent}%` }}
-            />
-          </div>
-        </div>
-      )}
+      <WebGPULoadingOverlay
+        isLoading={activeProvider === 'webgpu' && webLLM.isLoading}
+        selectedModel={selectedModel}
+        loadPercent={webLLM.loadPercent}
+        speed={webLLM.speed}
+        loadProgress={webLLM.loadProgress}
+      />
 
       {/* Error alert message */}
-      {errorMsg && (
-        <div className="p-4 rounded-xl border border-red-900/30 bg-red-950/10 text-red-400 text-xs flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="font-semibold">Evaluation Interrupted</p>
-            <p className="leading-relaxed">{errorMsg}</p>
-            {activeProvider === 'webgpu' && errorMsg.includes('maxStorageBuffersPerShaderStage') && (
-              <div className="mt-2 p-2.5 rounded bg-zinc-950/40 border border-red-900/20 text-zinc-300 space-y-1.5">
-                <p className="font-semibold text-yellow-500">⚠️ Hardware WebGPU Limits Exceeded</p>
-                <p className="leading-normal text-[11px]">
-                  Your browser or graphics card limits WebGPU shader stages to <strong>8</strong> storage buffers, while this model requires <strong>10</strong>.
-                </p>
-                <p className="leading-normal text-[11px]">
-                  <strong>Recommended Action:</strong> Switch the provider to <strong>Tier 2: Ollama (Local)</strong> or <strong>Tier 3: Cloud BYOK</strong> (OpenRouter / OpenAI / Gemini).
-                </p>
-              </div>
-            )}
-            {activeProvider === 'ollama' && (
-              <p className="mt-1.5 text-zinc-400">
-                Ensure you launched Ollama with: <code>OLLAMA_ORIGINS="*" ollama serve</code>
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      <ErrorAlert
+        errorMsg={errorMsg}
+        activeProvider={activeProvider}
+        onDismiss={inference.clearError}
+      />
 
       {/* Workspace core layouts */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -446,7 +323,6 @@ Ensure you list at least 6 core requirements from the job description. If a requ
                 </div>
               )}
               {output ? (
-                // Output is structured markdown, we render formatting using basic layout structures or a custom split display
                 <div className="markdown-body space-y-3 whitespace-pre-wrap select-text">
                   {output}
                 </div>

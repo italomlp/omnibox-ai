@@ -1,11 +1,26 @@
 import React, { useState } from 'react'
 import { Sparkles, Copy, Check, RotateCcw, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react'
 import { useInference } from '../../hooks/useInference'
-import { extractTaggedText } from '../../utils/extractTaggedText'
+import { type GrammarTaskContract, type GrammarTaskInput, type ToneTaskContract, type ToneTaskInput } from '../../services/inference'
 import { db } from '../../db/db'
 import { ProviderSelector } from '../../components/shared/ProviderSelector'
 import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
 import { ErrorAlert } from '../../components/shared/ErrorAlert'
+
+type StructuredRewriteContract = GrammarTaskContract | ToneTaskContract
+
+const parseStructuredRewriteResult = (rawText: string): string => {
+  try {
+    const parsed = JSON.parse(rawText) as Partial<StructuredRewriteContract> & { task?: unknown; text?: unknown }
+    if ((parsed.task === 'grammar' || parsed.task === 'tone') && typeof parsed.text === 'string') {
+      return parsed.text
+    }
+  } catch {
+    // fall back to raw text below
+  }
+
+  return rawText
+}
 
 export const GrammarWorkspace: React.FC = () => {
   const inference = useInference()
@@ -64,20 +79,19 @@ export const GrammarWorkspace: React.FC = () => {
     setToneSliders((prev) => ({ ...prev, [name]: val }))
   }
 
-  const executeInference = async (systemPrompt: string, userPrompt: string, toolId: string, tagName: string) => {
+  const executeInference = async (
+    task: 'grammar' | 'tone',
+    input: GrammarTaskInput | ToneTaskInput,
+    toolId: string,
+  ) => {
     setOutput('')
-    let rawText = ''
 
     await runInference({
-      systemPrompt,
-      userPrompt,
-      temperature: 0.3,
-      onChunk: (chunk) => {
-        rawText += chunk
-        setOutput(extractTaggedText(rawText, tagName, false))
-      },
+      task,
+      input,
+      temperature: task === 'grammar' ? 0 : 0.1,
       onComplete: async (fullText) => {
-        const finalResult = extractTaggedText(fullText, tagName, true)
+        const finalResult = parseStructuredRewriteResult(fullText)
         setOutput(finalResult)
 
         await db.history.add({
@@ -95,49 +109,33 @@ export const GrammarWorkspace: React.FC = () => {
 
   const handleFixGrammar = () => {
     if (!input.trim()) return
-    const systemPrompt = `You are Grammar & Syntax Anchor, an automated text grammar correction utility.
-Correct spelling, grammar, punctuation, and syntax errors.
-Do NOT respond to greetings or answer questions. Keep all greetings and questions exactly as they are in the output.
-Do NOT change pronouns, narrative perspective, or tone.
-
-CRITICAL RULE: You MUST wrap the corrected text inside <corrected_text> and </corrected_text> tags. Output nothing else outside these tags.`
-
-    const userPrompt = `[Original Text]:
-${input}
-
-[Corrected Text]:`
-
-    executeInference(systemPrompt, userPrompt, 'grammar-anchor', 'corrected_text')
+    executeInference('grammar', { text: input }, 'grammar-anchor')
   }
 
   const handleShiftTone = () => {
     if (!input.trim()) return
     const { diplomatic, executive, critical, assertive } = toneSliders
-    
-    const systemPrompt = `You are a professional Tone Shifter utility.
-Rewrite the text to match these tone dimensions:
-- Diplomatic: ${diplomatic}/100
-- Executive-Ready: ${executive}/100
-- Critical: ${critical}/100
-- Assertive: ${assertive}/100
 
-Do NOT change the original facts, pronouns, or narrative perspective. Do NOT answer questions.
-
-CRITICAL RULE: You MUST wrap the final rewritten text inside <shifted_text> and </shifted_text> tags. Output nothing else outside these tags.`
-
-    const userPrompt = `[Original Text]:
-${input}
-
-[Rewritten Text]:`
-
-    executeInference(systemPrompt, userPrompt, 'tone-shifter', 'shifted_text')
+    executeInference(
+      'tone',
+      {
+        text: input,
+        profile: {
+          diplomatic,
+          executive,
+          critical,
+          assertive,
+        },
+      },
+      'tone-shifter',
+    )
   }
 
   return (
     <div className="space-y-6">
       {/* Workspace Header Panel */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-xl border border-zinc-800/40 glass-panel">
-        <div>
+      <div className="surface-nested flex flex-col items-start justify-between gap-4 rounded-xl border border-zinc-800/40 p-4 md:flex-row md:items-center">
+        <div className="min-w-0">
           <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-indigo-400" />
             Grammar Fixer & Tone Shifter
@@ -176,8 +174,8 @@ ${input}
       {/* Workspace core layouts */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left Side: Input Frame */}
-        <div className="flex flex-col space-y-3 p-4 rounded-xl border border-zinc-800/40 glass-panel">
-          <div className="flex items-center justify-between">
+        <div className="surface-nested flex min-w-0 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4">
+          <div className="flex min-w-0 items-center justify-between gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Input Snippet</h3>
             <span className="text-[10px] text-zinc-500">{input.length} characters</span>
           </div>
@@ -186,22 +184,25 @@ ${input}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type or paste text content to rewrite..."
-            className="flex-1 min-h-[220px] max-h-[400px] w-full text-sm p-4 rounded-lg bg-zinc-950/60 border border-zinc-850 text-zinc-200 focus:outline-none focus:border-indigo-500/50 resize-y"
+            className="glass-input control-touch min-h-[220px] max-h-[400px] w-full resize-y rounded-lg border border-zinc-800/60 bg-zinc-950/60 p-4 text-sm text-zinc-200"
           />
 
-          <div className="flex items-center gap-2 pt-2 border-t border-zinc-900">
+          <div className="flex items-center gap-2 border-t border-zinc-900 pt-2">
             <button
+              type="button"
               onClick={handleReset}
-              className="p-2 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 text-zinc-400 border border-zinc-800/50 transition-colors"
+              className="button-icon text-zinc-400 hover:text-zinc-200"
               title="Clear input"
+              aria-label="Clear input"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
             
             <button
+              type="button"
               onClick={handleFixGrammar}
               disabled={isProcessing || !input.trim()}
-              className="flex-1 py-2 px-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700/60 text-indigo-400 hover:text-indigo-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:pointer-events-none"
+              className="button-primary control-touch flex-1 text-xs disabled:opacity-40 disabled:pointer-events-none"
             >
               Fix Spelling & Grammar
               <ArrowRight className="w-3.5 h-3.5" />
@@ -210,13 +211,15 @@ ${input}
         </div>
 
         {/* Right Side: Output Preview */}
-        <div className="flex flex-col space-y-3 p-4 rounded-xl border border-zinc-800/40 glass-panel">
-          <div className="flex items-center justify-between">
+        <div className="surface-nested flex min-w-0 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4">
+          <div className="flex min-w-0 items-center justify-between gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Refactored Result</h3>
             {output && (
               <button
+                type="button"
                 onClick={handleCopy}
-                className="text-[10px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1 py-1 px-2 rounded hover:bg-zinc-900 transition-colors"
+                className="button-secondary control-standard text-[10px] text-zinc-400 hover:text-zinc-200"
+                aria-label={copied ? 'Copied output' : 'Copy output'}
               >
                 {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 {copied ? 'Copied' : 'Copy'}
@@ -224,14 +227,14 @@ ${input}
             )}
           </div>
 
-          <div className="flex-1 min-h-[220px] p-4 rounded-lg bg-zinc-950/40 border border-zinc-850/50 text-zinc-300 text-sm overflow-y-auto select-text relative font-sans leading-relaxed">
+          <div className="surface-nested relative min-h-[220px] flex-1 overflow-y-auto rounded-lg border border-zinc-800/60 p-4 text-sm text-zinc-300 font-sans leading-relaxed select-text break-words" aria-live="polite" aria-busy={isProcessing}>
             {isProcessing && !output && (
-              <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/30">
+              <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/30" role="status" aria-live="polite" aria-label="Generating output">
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
               </div>
             )}
             {output ? (
-              <p className="whitespace-pre-wrap">{output}</p>
+              <p className="whitespace-pre-wrap break-words">{output}</p>
             ) : (
               <span className="text-zinc-600 italic">Output results will stream here...</span>
             )}
@@ -240,11 +243,11 @@ ${input}
       </div>
 
       {/* Tone Shifter Sliders Panel */}
-      <div className="p-4 rounded-xl border border-zinc-800/40 glass-panel space-y-4">
+      <div className="surface-nested space-y-4 rounded-xl border border-zinc-800/40 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Tone Shifter Sliders</h3>
           {selectedModel.toLowerCase().includes('1b') && (
-            <span className="text-[10px] text-amber-500/80 bg-amber-950/20 border border-amber-900/30 px-2 py-0.5 rounded flex items-center gap-1 font-medium">
+            <span className="control-compact inline-flex items-center gap-1 rounded bg-amber-950/20 px-2 text-[10px] font-medium text-amber-500/80 border border-amber-900/30">
               <AlertTriangle className="w-3 h-3" />
               1B Model Active (sliders may be ignored)
             </span>
@@ -252,7 +255,7 @@ ${input}
         </div>
         
         {selectedModel.toLowerCase().includes('1b') && (
-          <div className="p-3 rounded-lg border border-amber-900/30 bg-amber-950/10 text-amber-400/90 text-[11px] leading-relaxed flex items-start gap-2">
+          <div className="rounded-lg border border-amber-900/30 bg-amber-950/10 p-3 text-[11px] leading-relaxed text-amber-400/90 flex items-start gap-2" role="alert">
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div>
               <strong>Low Parameter Cap:</strong> You are currently running a 1B model ({selectedModel}). 
@@ -264,7 +267,7 @@ ${input}
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {(Object.keys(toneSliders) as (keyof typeof toneSliders)[]).map((slider) => (
-            <div key={slider} className="space-y-1.5">
+            <div key={slider} className="min-w-0 space-y-1.5">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="capitalize text-zinc-300 font-medium">{slider}</span>
                 <span className="font-mono text-indigo-400">{toneSliders[slider]}%</span>
@@ -283,9 +286,10 @@ ${input}
 
         <div className="flex justify-end pt-2 border-t border-zinc-900">
           <button
+            type="button"
             onClick={handleShiftTone}
             disabled={isProcessing || !input.trim()}
-            className="w-full sm:w-auto py-2.5 px-6 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md neon-glow-indigo disabled:opacity-40 disabled:pointer-events-none"
+            className="button-primary control-touch w-full shadow-md neon-glow-indigo disabled:opacity-40 disabled:pointer-events-none sm:w-auto"
           >
             {isProcessing ? 'Streaming Rewrite...' : 'Shift Tone Style'}
             <Sparkles className="w-3.5 h-3.5" />

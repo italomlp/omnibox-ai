@@ -1,10 +1,23 @@
 import { useState, useEffect } from 'react'
 import * as webLLM from '@mlc-ai/web-llm'
-import { PROVIDER_DEFAULT_MODELS, isSupportedWebLLMModel } from '../config/providers'
+import {
+  PROVIDER_DEFAULT_MODELS,
+  WEBLLM_MODEL_CONFIG_BY_ID,
+  isSupportedWebLLMModel,
+} from '../config/providers'
 
 // Cache the loaded model engine in memory to prevent reloading it on every hook mount
 let cachedEngine: webLLM.MLCEngineInterface | null = null
 let cachedModelId: string | null = null
+let engineQueue: Promise<void> = Promise.resolve()
+let abortRequested = false
+
+export interface WebLLMGenerationOptions {
+  temperature?: number
+  maxTokens?: number
+  stopSequences?: string | string[]
+  thinking?: boolean
+}
 
 export interface WebLLMHook {
   isSupported: boolean;
@@ -18,8 +31,34 @@ export interface WebLLMHook {
     modelId: string,
     prompt: string,
     systemPrompt?: string,
-    onChunk?: (text: string) => void
+    onChunk?: (text: string) => void,
+    options?: WebLLMGenerationOptions
   ) => Promise<string>;
+  abort: () => Promise<void>;
+}
+
+const createAbortError = (): Error => {
+  const error = new Error('WebLLM generation aborted.')
+  error.name = 'AbortError'
+  return error
+}
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof Error ? error.message : fallback
+
+const withEngineLock = <T>(task: () => Promise<T>): Promise<T> => {
+  const run = engineQueue.then(task, task)
+  engineQueue = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
+const isQwen3ThinkingSupported = (modelId: string): boolean => {
+  const modelConfig = WEBLLM_MODEL_CONFIG_BY_ID[modelId]
+
+  return Boolean(modelConfig && (modelConfig.supportsThinkingControl ?? modelConfig.family === 'Qwen3'))
 }
 
 export function useWebLLM(): WebLLMHook {
@@ -37,7 +76,7 @@ export function useWebLLM(): WebLLMHook {
     }
   }, [])
 
-  const loadModel = async (modelId: string): Promise<webLLM.MLCEngineInterface | null> => {
+  const loadModelLocked = async (modelId: string): Promise<webLLM.MLCEngineInterface | null> => {
     const resolvedModelId = isSupportedWebLLMModel(modelId)
       ? modelId
       : PROVIDER_DEFAULT_MODELS.webgpu
@@ -88,46 +127,82 @@ export function useWebLLM(): WebLLMHook {
       setLoadProgress('Model loaded successfully.')
       setLoadPercent(100)
       return engine
-    } catch (err: any) {
-      console.error('WebLLM load error:', err)
-      setError(err.message || 'Failed to initialize WebLLM engine.')
+    } catch (error: unknown) {
+      console.error('WebLLM load error:', error)
+      setError(getErrorMessage(error, 'Failed to initialize WebLLM engine.'))
       setIsLoading(false)
-      throw err
+      throw error
     }
   }
 
-  const generate = async (
+  const loadModel = async (modelId: string): Promise<webLLM.MLCEngineInterface | null> =>
+    withEngineLock(() => loadModelLocked(modelId))
+
+  const abort = async (): Promise<void> => {
+    abortRequested = true
+
+    const engine = cachedEngine
+    if (!engine) {
+      return
+    }
+
+    await Promise.resolve(engine.interruptGenerate())
+  }
+
+  const generateLocked = async (
     modelId: string,
     prompt: string,
     systemPrompt?: string,
-    onChunk?: (text: string) => void
+    onChunk?: (text: string) => void,
+    options?: WebLLMGenerationOptions
   ): Promise<string> => {
+    const resolvedModelId = isSupportedWebLLMModel(modelId)
+      ? modelId
+      : PROVIDER_DEFAULT_MODELS.webgpu
+
+    let engine = cachedEngine
+    if (!engine || cachedModelId !== resolvedModelId) {
+      engine = await loadModelLocked(resolvedModelId)
+    }
+    if (!engine) {
+      throw new Error('WebLLM engine failed to initialize.')
+    }
+
+    if (abortRequested) {
+      throw createAbortError()
+    }
+
+    const messages: webLLM.ChatCompletionMessageParam[] = []
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt })
+    }
+    messages.push({ role: 'user', content: prompt })
+
+    const request: webLLM.ChatCompletionRequestStreaming = {
+      messages,
+      stream: true,
+      max_tokens: options?.maxTokens ?? undefined,
+      temperature: options?.temperature ?? undefined,
+      stop: options?.stopSequences ?? undefined,
+      model: resolvedModelId,
+    }
+
+    const shouldDisableThinking =
+      options?.thinking === false && isQwen3ThinkingSupported(resolvedModelId)
+
+    if (shouldDisableThinking) {
+      request.extra_body = { enable_thinking: false }
+    }
+
     try {
-      const resolvedModelId = isSupportedWebLLMModel(modelId)
-        ? modelId
-        : PROVIDER_DEFAULT_MODELS.webgpu
-
-      let engine = cachedEngine
-      if (!engine || cachedModelId !== resolvedModelId) {
-        engine = await loadModel(resolvedModelId)
-      }
-      if (!engine) {
-        throw new Error('WebLLM engine failed to initialize.')
-      }
-
-      const messages: webLLM.ChatCompletionMessageParam[] = []
-      if (systemPrompt) {
-        messages.push({ role: 'system', content: systemPrompt })
-      }
-      messages.push({ role: 'user', content: prompt })
-
-      const completion = await engine.chat.completions.create({
-        messages,
-        stream: true,
-      })
+      const completion = await engine.chat.completions.create(request)
 
       let fullText = ''
       for await (const chunk of completion) {
+        if (abortRequested) {
+          throw createAbortError()
+        }
+
         const text = chunk.choices[0]?.delta?.content || ''
         if (text) {
           fullText += text
@@ -137,13 +212,27 @@ export function useWebLLM(): WebLLMHook {
         }
       }
 
+      if (abortRequested) {
+        throw createAbortError()
+      }
+
       return fullText
-    } catch (err: any) {
-      console.error('WebLLM generation error:', err)
-      setError(err.message || 'Generation failed.')
-      throw err
+    } catch (error: unknown) {
+      console.error('WebLLM generation error:', error)
+      setError(getErrorMessage(error, 'Generation failed.'))
+      throw error
+    } finally {
+      abortRequested = false
     }
   }
+
+  const generate = async (
+    modelId: string,
+    prompt: string,
+    systemPrompt?: string,
+    onChunk?: (text: string) => void,
+    options?: WebLLMGenerationOptions
+  ): Promise<string> => withEngineLock(() => generateLocked(modelId, prompt, systemPrompt, onChunk, options))
 
   return {
     isSupported,
@@ -154,5 +243,6 @@ export function useWebLLM(): WebLLMHook {
     error,
     loadModel,
     generate,
+    abort,
   }
 }

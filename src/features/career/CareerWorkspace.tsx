@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Briefcase, Eye, Save, Trash, ArrowRight, Loader2, Sparkles, History, Upload } from 'lucide-react'
 import { useInference } from '../../hooks/useInference'
 import { extractTextFromPdf, extractTextFromDocx } from '../../utils/pdfParser'
@@ -7,6 +7,33 @@ import { ProviderSelector } from '../../components/shared/ProviderSelector'
 import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
 import { ErrorAlert } from '../../components/shared/ErrorAlert'
 import { useSettingsStore } from '../../store/useSettingsStore'
+import { WEBLLM_MODEL_CONFIG_BY_ID } from '../../config/providers'
+import { getTaskContextBudget, type CareerTaskContract } from '../../services/inference'
+
+const parseCareerAnalysis = (rawText: string): CareerTaskContract | null => {
+  try {
+    const parsed = JSON.parse(rawText) as Partial<CareerTaskContract> & { task?: unknown; summary?: unknown; requirements?: unknown }
+    if (parsed.task !== 'gap-analysis' || typeof parsed.summary !== 'string' || !Array.isArray(parsed.requirements)) {
+      return null
+    }
+
+    return parsed as CareerTaskContract
+  } catch {
+    return null
+  }
+}
+
+const statusLabel: Record<CareerTaskContract['requirements'][number]['status'], string> = {
+  match: 'Match',
+  partial_gap: 'Partial gap',
+  omission: 'Omission',
+}
+
+const statusClass: Record<CareerTaskContract['requirements'][number]['status'], string> = {
+  match: 'border-emerald-900/30 bg-emerald-950/20 text-emerald-300',
+  partial_gap: 'border-amber-900/30 bg-amber-950/20 text-amber-300',
+  omission: 'border-rose-900/30 bg-rose-950/20 text-rose-300',
+}
 
 export const CareerWorkspace: React.FC = () => {
   const inference = useInference()
@@ -94,6 +121,7 @@ export const CareerWorkspace: React.FC = () => {
   
   // States
   const [output, setOutput] = useState('')
+  const [gapAnalysis, setGapAnalysis] = useState<CareerTaskContract | null>(null)
   
   // IndexedDB Document lists
   const [savedResumes, setSavedResumes] = useState<{ id?: number; name: string; content: string }[]>([])
@@ -138,6 +166,23 @@ export const CareerWorkspace: React.FC = () => {
       localStorage.removeItem('omnibox-career-reload')
     }
   }, [])
+
+  const selectedWebLLMConfig = activeProvider === 'webgpu' ? WEBLLM_MODEL_CONFIG_BY_ID[selectedModel] : undefined
+
+  const gapAnalysisBudget = useMemo(() => {
+    if (!selectedWebLLMConfig) {
+      return null
+    }
+
+    return getTaskContextBudget(
+      'gap-analysis',
+      {
+        resumeText,
+        jobDescription: jobDescText,
+      },
+      { contextWindowTokens: selectedWebLLMConfig.contextWindow },
+    )
+  }, [jobDescText, resumeText, selectedWebLLMConfig])
 
 
   const handleSaveResume = async () => {
@@ -185,6 +230,7 @@ export const CareerWorkspace: React.FC = () => {
       return
     }
 
+    setGapAnalysis(null)
     setOutput('')
     
     const userPrompt = `## CANDIDATE RESUME:
@@ -241,21 +287,49 @@ Output a structured executive evaluation. Use markdown format. Include sections:
   }
 
   const runGapAnalysis = () => {
-    const prompt = `You are a career gap-analysis assistant. Compare the candidate's resume and the job description side-by-side. 
-Generate a markdown table mapping every major requirement mentioned in the Job Description to the evidence inside the candidate's resume.
-The table must use columns:
-...
-| Required Skill / Responsibility | Evidence in Resume | Status (Match / Partial Gap / Omission) | Recommendation / Bullet to Add |
+    if (!resumeText.trim() || !jobDescText.trim()) {
+      inference.abort()
+      alert('Please supply both your resume content and the job description to run this evaluation.')
+      return
+    }
 
-Ensure you list at least 6 core requirements from the job description. If a requirement has no evidence in the resume, explicitly mark the status as "Omission" and provide a placeholder bullet demonstrating how the candidate could showcase this skill if they have it.`
-    runAnalysis(prompt, 'gap-analysis')
+    setOutput('')
+    setGapAnalysis(null)
+
+    void runInference({
+      task: 'gap-analysis',
+      input: {
+        resumeText,
+        jobDescription: jobDescText,
+      },
+      temperature: 0,
+      onComplete: async (fullText) => {
+        const parsed = parseCareerAnalysis(fullText)
+        if (parsed) {
+          setGapAnalysis(parsed)
+        } else {
+          setOutput('Structured gap analysis output could not be parsed.')
+        }
+
+        await db.history.add({
+          workspaceId: 'career',
+          toolId: 'gap-analysis',
+          timestamp: Date.now(),
+          input: { resume: resumeText, jobDesc: jobDescText },
+          output: fullText,
+          provider: activeProvider,
+          model: selectedModel,
+        })
+        loadStoredData()
+      },
+    })
   }
 
   return (
     <div className="space-y-6">
       {/* Workspace Header Panel */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-xl border border-zinc-800/40 glass-panel">
-        <div>
+      <div className="surface-nested flex flex-col items-start justify-between gap-4 rounded-xl border border-zinc-800/40 p-4 md:flex-row md:items-center">
+        <div className="min-w-0">
           <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-indigo-400" />
             Career Engineering Suite
@@ -294,17 +368,17 @@ Ensure you list at least 6 core requirements from the job description. If a requ
       {/* Workspace core layouts */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left Side: Dual input frames */}
-        <div className="space-y-4 flex flex-col">
+        <div className="flex flex-col space-y-4 min-w-0">
           {/* Resume manager panel */}
-          <div className="p-4 rounded-xl border border-zinc-800/40 glass-panel space-y-3">
+          <div className="surface-nested space-y-3 rounded-xl border border-zinc-800/40 p-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                 1. Candidate Resume / CV
               </h3>
-              
-              <div className="flex flex-wrap items-center gap-2">
+
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 {/* File picker */}
-                <label className="flex items-center gap-1.5 py-1 px-2.5 rounded bg-zinc-900 border border-zinc-850 hover:border-zinc-700 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer">
+                <label className="button-secondary control-touch cursor-pointer select-none text-[10px] text-indigo-400 hover:text-indigo-300">
                   <Upload className="w-3 h-3 flex-shrink-0" />
                   Upload CV (PDF/DOCX)
                   <input
@@ -319,13 +393,15 @@ Ensure you list at least 6 core requirements from the job description. If a requ
                   type="text"
                   value={resumeName}
                   onChange={(e) => setResumeName(e.target.value)}
-                  className="text-xs bg-zinc-950 border border-zinc-800 rounded py-1 px-2 text-zinc-300 w-28 focus:outline-none focus:border-indigo-500"
+                  className="control-standard model-control w-28 rounded-md border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300"
                   placeholder="Document Name"
                 />
                 <button
+                  type="button"
                   onClick={handleSaveResume}
-                  className="p-1 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 transition-colors"
+                  className="button-icon text-zinc-300 hover:text-zinc-100"
                   title="Save CV content to database"
+                  aria-label="Save CV content to database"
                 >
                   <Save className="w-3.5 h-3.5" />
                 </button>
@@ -334,32 +410,36 @@ Ensure you list at least 6 core requirements from the job description. If a requ
 
             {/* Parsing status bar */}
             {fileParsingStatus && (
-              <div className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1.5 py-1 border-b border-zinc-900 animate-pulse">
+              <div className="flex items-center gap-1.5 border-b border-zinc-900 py-1 text-[10px] font-semibold text-indigo-400 animate-pulse" role="status" aria-live="polite">
                 <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" /> {fileParsingStatus}
               </div>
             )}
 
             {fileParsingError && (
-              <div className="text-[11px] text-amber-300 bg-amber-950/20 border border-amber-900/30 rounded-lg px-3 py-2 leading-relaxed">
+              <div className="rounded-lg border border-amber-900/30 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-300" role="alert">
                 {fileParsingError}
               </div>
             )}
 
             {/* Load Saved Resume List */}
             {savedResumes.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 py-1.5 border-y border-zinc-900">
+              <div className="flex flex-wrap items-center gap-2 border-y border-zinc-900 py-1.5 min-w-0">
                 <span className="text-[10px] text-zinc-500">Stored:</span>
                 {savedResumes.map((doc) => (
-                  <div key={doc.id} className="flex items-center gap-1 bg-zinc-900/80 border border-zinc-800 rounded px-2 py-0.5 text-[10px] text-zinc-300">
+                  <div key={doc.id} className="flex min-w-0 items-center gap-1 rounded border border-zinc-800 bg-zinc-900/80 px-2 py-0.5 text-[10px] text-zinc-300">
                     <button 
+                      type="button"
                       onClick={() => handleLoadResume(doc.content, doc.name)}
-                      className="hover:text-indigo-400 font-medium"
+                      className="max-w-28 truncate font-medium hover:text-indigo-400"
+                      aria-label={`Load saved resume ${doc.name}`}
                     >
                       {doc.name}
                     </button>
                     <button 
+                      type="button"
                       onClick={() => handleDeleteResume(doc.id!)}
-                      className="hover:text-red-400 ml-1 text-zinc-500"
+                      className="button-icon ml-1 h-6 w-6 shrink-0 text-zinc-500 hover:text-red-400"
+                      aria-label={`Delete saved resume ${doc.name}`}
                     >
                       <Trash className="w-2.5 h-2.5" />
                     </button>
@@ -372,12 +452,12 @@ Ensure you list at least 6 core requirements from the job description. If a requ
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
               placeholder="Paste raw text or markdown CV details here..."
-              className="w-full h-44 text-xs p-3 rounded-lg bg-zinc-950/60 border border-zinc-850 text-zinc-200 focus:outline-none focus:border-indigo-500/50 resize-y font-mono"
+              className="glass-input control-touch h-44 w-full resize-y rounded-lg border border-zinc-800/60 bg-zinc-950/60 p-3 text-xs font-mono text-zinc-200"
             />
           </div>
 
           {/* Job description input */}
-          <div className="p-4 rounded-xl border border-zinc-800/40 glass-panel space-y-3">
+          <div className="surface-nested space-y-3 rounded-xl border border-zinc-800/40 p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
               2. Target Job Description
             </h3>
@@ -385,22 +465,22 @@ Ensure you list at least 6 core requirements from the job description. If a requ
               value={jobDescText}
               onChange={(e) => setJobDescText(e.target.value)}
               placeholder="Paste the target job description requirements here..."
-              className="w-full h-44 text-xs p-3 rounded-lg bg-zinc-950/60 border border-zinc-850 text-zinc-200 focus:outline-none focus:border-indigo-500/50 resize-y"
+              className="glass-input control-touch h-44 w-full resize-y rounded-lg border border-zinc-800/60 bg-zinc-950/60 p-3 text-xs text-zinc-200"
             />
           </div>
         </div>
 
         {/* Right Side: Output Preview & Controls */}
-        <div className="flex flex-col space-y-4">
+        <div className="flex min-w-0 flex-col space-y-4">
           {/* Action Trigger Deck */}
-          <div className="p-4 rounded-xl border border-zinc-800/40 glass-panel space-y-3.5">
+          <div className="surface-nested space-y-3.5 rounded-xl border border-zinc-800/40 p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">3. Run Career Diagnostics</h3>
 
             {/* a11y-compliant Tool Definitions Card */}
             <div
               role="region"
               aria-label="Diagnostics tool definitions"
-              className="p-3.5 rounded-lg bg-zinc-950/40 border border-zinc-850/50 text-[11px] text-zinc-400 space-y-2.5"
+              className="surface-nested space-y-2.5 rounded-lg border border-zinc-800/60 bg-zinc-950/40 p-3.5 text-[11px] text-zinc-400"
             >
               <h4 id="diagnostics-info-title" className="font-semibold text-zinc-300 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Diagnostic Scope & Capabilities
@@ -421,51 +501,122 @@ Ensure you list at least 6 core requirements from the job description. If a requ
               </dl>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
               <button
+                type="button"
                 onClick={runAtsAudit}
                 disabled={isProcessing || !resumeText.trim() || !jobDescText.trim()}
-                className="py-2 px-3 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700/60 hover:text-indigo-300 text-indigo-400 text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none"
+                className="button-secondary control-touch text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-40 disabled:pointer-events-none"
               >
                 ATS Audit
                 <Sparkles className="w-3.5 h-3.5" />
               </button>
               
               <button
+                type="button"
                 onClick={runSemanticEvaluation}
                 disabled={isProcessing || !resumeText.trim() || !jobDescText.trim()}
-                className="py-2 px-3 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700/60 hover:text-indigo-300 text-indigo-400 text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none"
+                className="button-secondary control-touch text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-40 disabled:pointer-events-none"
               >
                 Semantic Suitability
                 <Eye className="w-3.5 h-3.5" />
               </button>
 
               <button
+                type="button"
                 onClick={runGapAnalysis}
                 disabled={isProcessing || !resumeText.trim() || !jobDescText.trim()}
-                className="py-2 px-3 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700/60 hover:text-indigo-300 text-indigo-400 text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none"
+                className="button-secondary control-touch text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-40 disabled:pointer-events-none"
               >
                 Gap Analysis Matrix
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
+
+            {gapAnalysisBudget && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${gapAnalysisBudget.fits ? 'border-emerald-900/30 bg-emerald-950/20 text-emerald-300' : 'border-amber-900/30 bg-amber-950/20 text-amber-300'}`}
+              >
+                {gapAnalysisBudget.fits ? (
+                  <>
+                    Selected model fits this gap analysis context budget ({gapAnalysisBudget.estimatedInputTokens}/{gapAnalysisBudget.availableInputTokens} tokens estimated).
+                  </>
+                ) : (
+                  <>
+                    Context budget exceeded by about {gapAnalysisBudget.overflowTokens} tokens for this selected model.
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Results panel */}
-          <div className="flex-1 p-4 rounded-xl border border-zinc-800/40 glass-panel flex flex-col space-y-3 min-h-[300px]">
+          <div className="surface-nested flex min-h-[300px] flex-1 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4 min-w-0">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Analysis Output</h3>
-            <div className="flex-1 p-4 rounded-lg bg-zinc-950/40 border border-zinc-850/50 text-zinc-300 text-xs overflow-y-auto select-text relative font-sans leading-relaxed">
+            <div className="surface-nested relative flex-1 overflow-y-auto rounded-lg border border-zinc-800/60 p-4 text-xs text-zinc-300 font-sans leading-relaxed select-text break-words" aria-live="polite" aria-busy={isProcessing}>
               {isProcessing && !output && (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/30">
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/30" role="status" aria-live="polite" aria-label="Generating analysis">
                   <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
                 </div>
               )}
-              {output ? (
-                <div className="markdown-body space-y-3 whitespace-pre-wrap select-text">
-                  {output}
+              {gapAnalysis ? (
+                <div className="space-y-4 select-text">
+                  <section className="rounded-lg border border-zinc-800/60 bg-zinc-950/50 p-4 space-y-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Summary</div>
+                    <p className="text-sm leading-relaxed text-zinc-200 whitespace-pre-wrap break-words">{gapAnalysis.summary}</p>
+                  </section>
+
+                  <section className="space-y-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                      Requirements ({gapAnalysis.requirements.length})
+                    </div>
+
+                    <div className="space-y-3">
+                      {gapAnalysis.requirements.map((requirement, index) => (
+                        <article key={`${requirement.requirement}-${index}`} className="rounded-lg border border-zinc-800/60 bg-zinc-950/40 p-4 space-y-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <h4 className="text-sm font-semibold text-zinc-100">{requirement.requirement}</h4>
+                            <span className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusClass[requirement.status]}`}>
+                              {statusLabel[requirement.status]}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Source evidence</div>
+                            {requirement.resumeEvidence.length > 0 ? (
+                              <ul className="space-y-1.5 text-xs text-zinc-300">
+                                {requirement.resumeEvidence.map((evidence, evidenceIndex) => (
+                                  <li key={`${evidenceIndex}-${evidence}`} className="rounded border border-zinc-800/70 bg-zinc-900/60 px-3 py-2 whitespace-pre-wrap break-words">
+                                    {evidence}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs italic text-zinc-500">No direct resume evidence found.</p>
+                            )}
+                          </div>
+
+                          {requirement.recommendation && (
+                            <div className="space-y-1.5">
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Conditional recommendation</div>
+                              <p className="text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words">{requirement.recommendation}</p>
+                            </div>
+                          )}
+                        </article>
+                      ))}
+                    </div>
+                  </section>
                 </div>
               ) : (
-                <span className="text-zinc-600 italic">Select one of the diagnostic tools above to run evaluation streams...</span>
+                output ? (
+                  <div className="markdown-body space-y-3 whitespace-pre-wrap break-words select-text">
+                    {output}
+                  </div>
+                ) : (
+                  <span className="text-zinc-600 italic">Select one of the diagnostic tools above to run evaluation streams...</span>
+                )
               )}
             </div>
           </div>
@@ -474,23 +625,34 @@ Ensure you list at least 6 core requirements from the job description. If a requ
 
       {/* History log drawer */}
       {pastAnalyses.length > 0 && (
-        <div className="p-4 rounded-xl border border-zinc-800/40 glass-panel space-y-3">
+        <div className="surface-nested space-y-3 rounded-xl border border-zinc-800/40 p-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
             <History className="w-4 h-4 text-zinc-500" /> Past Analysis Logs
           </h3>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
             {pastAnalyses.map((log) => (
-              <div key={log.id} className="p-3 rounded-lg bg-zinc-950 border border-zinc-850 text-left space-y-1.5">
+              <div key={log.id} className="surface-nested space-y-1.5 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-left min-w-0">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold text-indigo-400 uppercase">{log.toolId.replace('-', ' ')}</span>
                   <span className="text-[9px] text-zinc-500">{new Date(log.timestamp).toLocaleDateString()}</span>
                 </div>
-                <p className="text-[10px] text-zinc-400 line-clamp-3 leading-relaxed">
-                  {log.output}
+                <p className="break-words text-[10px] leading-relaxed text-zinc-400 line-clamp-3">
+                  {log.toolId === 'gap-analysis' ? parseCareerAnalysis(log.output)?.summary ?? 'Structured gap analysis result' : log.output}
                 </p>
                 <button
-                  onClick={() => setOutput(log.output)}
-                  className="text-[9px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                  type="button"
+                  onClick={() => {
+                    const parsed = log.toolId === 'gap-analysis' ? parseCareerAnalysis(log.output) : null
+                    if (parsed) {
+                      setOutput('')
+                      setGapAnalysis(parsed)
+                      return
+                    }
+
+                    setGapAnalysis(null)
+                    setOutput('Structured gap analysis result could not be parsed.')
+                  }}
+                  className="button-secondary control-standard text-[9px] text-indigo-400 hover:text-indigo-300"
                 >
                   Reload result
                 </button>

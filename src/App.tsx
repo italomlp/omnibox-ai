@@ -49,7 +49,7 @@ const App: React.FC = () => {
   }, [ui.theme])
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-zinc-100 antialiased font-sans">
+    <div className="flex min-h-screen overflow-x-clip bg-zinc-950 text-zinc-100 antialiased font-sans">
       <AppSidebar
         workspaces={workspaces}
         activeWorkspace={ui.activeWorkspace}
@@ -60,7 +60,7 @@ const App: React.FC = () => {
         privacyMode={settings.privacyMode}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 bg-[#09090b]">
+      <div className="flex flex-1 min-w-0 flex-col bg-[#09090b]">
         <AppHeader
           workspaceName={activeWorkspaceName}
           privacyMode={settings.privacyMode}
@@ -68,7 +68,7 @@ const App: React.FC = () => {
           onToggleSidebar={ui.toggleSidebar}
         />
 
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto select-none">
+        <main className="flex-1 overflow-y-auto overflow-x-clip p-4 md:p-6">
           <div className="mx-auto max-w-5xl">
             <WorkspaceRouter activeWorkspace={ui.activeWorkspace} />
           </div>

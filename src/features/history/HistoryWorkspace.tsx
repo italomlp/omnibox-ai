@@ -175,7 +175,7 @@ export const HistoryWorkspace: React.FC = () => {
 
       {/* History Grid */}
       {filteredLogs.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredLogs.map((log) => (
             <HistoryItemCard
               key={log.id}
@@ -188,7 +188,7 @@ export const HistoryWorkspace: React.FC = () => {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-zinc-800/40 bg-zinc-900/10 text-center space-y-3">
-          <Inbox className="w-10 h-10 text-zinc-650" />
+          <Inbox className="w-10 h-10 text-zinc-600" />
           <div>
             <h4 className="text-xs font-bold text-zinc-300">No prompt logs found</h4>
             <p className="text-[11px] text-zinc-500 mt-0.5 max-w-xs leading-relaxed">

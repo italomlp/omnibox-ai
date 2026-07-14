@@ -1,6 +1,8 @@
 import React from 'react'
-import { PROVIDER_DEFAULT_MODELS, PROVIDER_MODELS_LIST } from '../../config/providers'
+import { PROVIDER_MODELS_LIST } from '../../config/providers'
 import type { ProviderId } from '../../config/providers'
+import { WebLLMModelPicker } from './WebLLMModelPicker'
+import { useSettingsStore } from '../../store/useSettingsStore'
 
 interface ProviderSelectorProps {
   activeProvider: ProviderId;
@@ -17,6 +19,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   onModelChange,
   availableProviders,
 }) => {
+  const persistSelectedModel = useSettingsStore((state) => state.setSelectedModel)
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
       <div className="flex min-w-0 flex-col space-y-1 sm:w-auto">
@@ -40,30 +44,34 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
       <div className="flex min-w-0 flex-col space-y-1 sm:w-auto">
         <label className="text-[10px] text-zinc-500 font-semibold uppercase">Model</label>
-        <select
-          value={
-            activeProvider === 'webgpu' && !PROVIDER_MODELS_LIST.webgpu.includes(selectedModel)
-              ? PROVIDER_DEFAULT_MODELS.webgpu
-              : selectedModel
-          }
-          onChange={(e) => onModelChange(e.target.value)}
-          className="model-control min-w-0 w-full text-xs bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-zinc-300 focus:outline-none focus:border-indigo-500 cursor-pointer sm:w-auto sm:max-w-64"
-        >
-          {(() => {
-            const list = PROVIDER_MODELS_LIST[activeProvider] || []
-            if (activeProvider === 'webgpu') {
+        {activeProvider === 'webgpu' ? (
+          <WebLLMModelPicker
+            value={selectedModel}
+            onChange={(model) => {
+              onModelChange(model)
+              persistSelectedModel('webgpu', model)
+            }}
+            className="w-full sm:max-w-[28rem]"
+          />
+        ) : (
+          <select
+            value={selectedModel}
+            onChange={(e) => onModelChange(e.target.value)}
+            className="model-control min-w-0 w-full text-xs bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-zinc-300 focus:outline-none focus:border-indigo-500 cursor-pointer sm:w-auto sm:max-w-64"
+          >
+            {(() => {
+              const list = PROVIDER_MODELS_LIST[activeProvider] || []
+              if (selectedModel && !list.includes(selectedModel)) {
+                return [...list, selectedModel]
+              }
               return list
-            }
-            if (selectedModel && !list.includes(selectedModel)) {
-              return [...list, selectedModel]
-            }
-            return list
-          })().map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
+            })().map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
   )

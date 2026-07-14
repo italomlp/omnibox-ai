@@ -21,7 +21,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   onClearHistory,
 }) => {
   return (
-    <div className="p-4 rounded-xl border border-zinc-800/40 bg-zinc-900/30 glass-panel space-y-4">
+    <div className="surface-nested space-y-4 rounded-xl border border-zinc-800/40 bg-zinc-900/30 p-4">
       {/* Filtering Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
         {/* Search */}
@@ -32,7 +32,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search inputs, models, or generated results..."
-            className="w-full text-xs py-2 pl-9 pr-4 rounded-lg bg-zinc-950/60 border border-zinc-850 text-zinc-200 focus:outline-none focus:border-indigo-500/50"
+            className="control-standard model-control w-full rounded-lg border border-zinc-800/60 bg-zinc-950/60 pl-9 pr-4 text-xs text-zinc-200"
             aria-label="Search history logs"
           />
         </div>
@@ -44,7 +44,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             <select
               value={sortOrder}
               onChange={(e) => onSortChange(e.target.value as 'desc' | 'asc')}
-              className="text-xs bg-zinc-950 border border-zinc-800 rounded py-1 px-2.5 text-zinc-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="control-standard model-control cursor-pointer rounded-md border border-zinc-800 bg-zinc-950 px-2.5 text-xs text-zinc-300"
               aria-label="Sort order"
             >
               <option value="desc">Newest First</option>
@@ -54,7 +54,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
 
           <button
             onClick={onClearHistory}
-            className="py-1 px-2.5 rounded bg-red-950/20 border border-red-900/30 hover:border-red-800 text-red-400 text-xs font-semibold flex items-center gap-1 transition-all"
+            className="button-danger control-standard"
             title="Clear all history entries"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -67,22 +67,24 @@ export const HistoryList: React.FC<HistoryListProps> = ({
       <div className="flex flex-wrap items-center gap-2 border-t border-zinc-900/60 pt-3.5">
         <button
           onClick={() => onWorkspaceChange('all')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`control-standard rounded-lg px-3 text-xs font-semibold ${
             selectedWorkspace === 'all'
               ? 'bg-zinc-800 text-indigo-400 border border-zinc-700/60'
-              : 'text-zinc-400 hover:bg-zinc-900/40 hover:text-zinc-200 border border-transparent'
+              : 'border border-transparent text-zinc-400 hover:bg-zinc-900/40 hover:text-zinc-200'
           }`}
+          aria-pressed={selectedWorkspace === 'all'}
         >
           All Activities
         </button>
 
         <button
           onClick={() => onWorkspaceChange('grammar')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+          className={`control-standard rounded-lg px-3 text-xs font-semibold ${
             selectedWorkspace === 'grammar'
-              ? 'bg-violet-950/40 text-violet-400 border border-violet-900/40'
-              : 'text-zinc-400 hover:bg-zinc-900/40 hover:text-zinc-200 border border-transparent'
+              ? 'border border-violet-900/40 bg-violet-950/40 text-violet-400'
+              : 'border border-transparent text-zinc-400 hover:bg-zinc-900/40 hover:text-zinc-200'
           }`}
+          aria-pressed={selectedWorkspace === 'grammar'}
         >
           <Sparkles className="w-3.5 h-3.5" />
           Grammar & Tone
@@ -90,11 +92,12 @@ export const HistoryList: React.FC<HistoryListProps> = ({
 
         <button
           onClick={() => onWorkspaceChange('career')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+          className={`control-standard rounded-lg px-3 text-xs font-semibold ${
             selectedWorkspace === 'career'
-              ? 'bg-indigo-950/40 text-indigo-400 border border-indigo-900/40'
-              : 'text-zinc-400 hover:bg-zinc-900/40 hover:text-zinc-200 border border-transparent'
+              ? 'border border-indigo-900/40 bg-indigo-950/40 text-indigo-400'
+              : 'border border-transparent text-zinc-400 hover:bg-zinc-900/40 hover:text-zinc-200'
           }`}
+          aria-pressed={selectedWorkspace === 'career'}
         >
           <Briefcase className="w-3.5 h-3.5" />
           Career Suite

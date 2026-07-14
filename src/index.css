@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+html {
+  color-scheme: dark;
+  --focus-ring: rgba(99, 102, 241, 0.45);
+  --focus-ring-soft: rgba(99, 102, 241, 0.16);
+}
+
 @theme {
   --color-indigo-glow: rgba(99, 102, 241, 0.15);
   --color-violet-glow: rgba(139, 92, 246, 0.15);
@@ -13,7 +19,21 @@
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
+  }
+
+  :where(button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])) {
+    transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  :where(button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid transparent;
+    box-shadow: 0 0 0 2px rgb(9 9 11 / 0.85), 0 0 0 4px var(--focus-ring);
+  }
+
+  input[type="range"]:focus-visible {
+    box-shadow: 0 0 0 2px rgb(9 9 11 / 0.85), 0 0 0 4px var(--focus-ring);
   }
 }
 
@@ -42,7 +62,9 @@
 }
 
 .glass-panel-hover {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 250ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-panel-hover:hover {
   background: rgba(20, 20, 30, 0.55);
@@ -53,13 +75,118 @@
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
   color: #f4f4f5;
-  transition: all 0.15s ease-in-out;
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
 }
-.glass-input:focus {
+.glass-input:focus-visible {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(99, 102, 241, 0.4);
   outline: none;
   box-shadow: 0 0 10px -2px rgba(99, 102, 241, 0.25);
+}
+
+.surface-nested {
+  background: rgba(15, 15, 20, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.control-compact,
+.control-standard,
+.control-touch,
+.button-primary,
+.button-secondary,
+.button-icon,
+.button-danger {
+  border-radius: 0.75rem;
+}
+
+.control-compact {
+  min-height: 2.25rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.control-standard {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+}
+
+.control-touch {
+  min-height: 2.75rem;
+  padding: 0.625rem 1rem;
+}
+
+.button-primary,
+.button-secondary,
+.button-danger,
+.button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.button-primary {
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  background: rgb(79 70 229);
+  color: #fff;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  box-shadow: 0 10px 24px -18px rgba(79, 70, 229, 0.85);
+}
+
+.button-secondary {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  background: rgba(39, 39, 42, 0.68);
+  color: #d4d4d8;
+  border: 1px solid rgba(63, 63, 70, 0.82);
+}
+
+.button-icon {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.625rem;
+  border: 1px solid rgba(63, 63, 70, 0.72);
+  background: rgba(39, 39, 42, 0.68);
+  color: #a1a1aa;
+}
+
+.button-danger {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  background: rgba(127, 29, 29, 0.24);
+  color: #f87171;
+  border: 1px solid rgba(127, 29, 29, 0.32);
+}
+
+.theme-icon-button,
+.app-nav-item,
+.model-control,
+.status-card,
+.status-pill {
+  transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+.model-control {
+  max-width: 100%;
+  min-height: 2.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])) {
+    transition-duration: 1ms;
+  }
+
+  .animate-spin,
+  .animate-pulse {
+    animation: none !important;
+  }
 }
 
 .app-header {
@@ -82,7 +209,9 @@
 .model-control,
 .status-card,
 .status-pill {
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
 }
 
 .model-control {
@@ -105,6 +234,7 @@
    ========================================================================== */
 html.light {
   color-scheme: light;
+  --focus-ring: rgba(79, 70, 229, 0.28);
   --app-bg: #f4f4f5;
   --app-surface: #ffffff;
   --app-surface-muted: #f8fafc;
@@ -197,6 +327,44 @@ html.light .settings-provider-card {
 
 html.light .settings-provider-card:hover {
   border-color: var(--app-border-strong) !important;
+}
+
+html.light .surface-nested {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: rgba(9, 9, 11, 0.08) !important;
+  box-shadow: 0 4px 18px -12px rgba(15, 23, 42, 0.24);
+}
+
+html.light .control-compact,
+html.light .control-standard,
+html.light .control-touch,
+html.light .model-control {
+  background: #ffffff !important;
+  border-color: rgba(9, 9, 11, 0.12) !important;
+  color: #09090b !important;
+}
+
+html.light .button-primary {
+  background: #4f46e5 !important;
+  border-color: rgba(79, 70, 229, 0.35) !important;
+  color: #ffffff !important;
+}
+
+html.light .button-secondary,
+html.light .button-icon,
+html.light .button-danger {
+  background: #ffffff !important;
+  border-color: rgba(9, 9, 11, 0.12) !important;
+}
+
+html.light .button-secondary,
+html.light .button-icon {
+  color: #52525b !important;
+}
+
+html.light .button-danger {
+  background: rgba(220, 38, 38, 0.08) !important;
+  color: #dc2626 !important;
 }
 
 html.light .privacy-provider-card {
@@ -346,10 +514,8 @@ html.light .text-yellow-500 {
 /* Borders overrides */
 html.light .border-zinc-900\/60,
 html.light .border-zinc-800\/50,
-html.light .border-zinc-850\/50,
 html.light .border-zinc-800\/40,
 html.light .border-zinc-800\/80,
-html.light .border-zinc-850,
 html.light .border-zinc-800,
 html.light .border-zinc-900,
 html.light .border-emerald-800\/30,
@@ -389,7 +555,7 @@ html.light .glass-input {
   border-color: rgba(9, 9, 11, 0.08) !important;
   color: #09090b !important;
 }
-html.light .glass-input:focus {
+html.light .glass-input:focus-visible {
   background: #ffffff !important;
   border-color: rgba(99, 102, 241, 0.4) !important;
   box-shadow: 0 0 10px -2px rgba(99, 102, 241, 0.15) !important;

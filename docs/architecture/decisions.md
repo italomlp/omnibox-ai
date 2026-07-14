@@ -54,7 +54,14 @@ This document outlines the core technical architecture decisions, justifications
 
 ---
 
-## 7. Security Backlog: API Key Storage
+## 7. Client-Side Document Parsing
+* **Decision:** TXT and Markdown parsing run fully offline. PDF and DOCX parsing use client-side browser libraries loaded from cdnjs only when privacy mode is off.
+* **Justification:** This keeps the app serverless while avoiding bundling large parser libraries into the default application payload. Privacy mode treats third-party parser CDN loading as an external request and blocks it with a user-facing warning.
+* **Implications:** PDF/DOCX parsing remains available in normal mode, but local-only users should upload TXT or Markdown files until parser libraries are vendored as lazy-loaded local dependencies.
+
+---
+
+## 8. Security Backlog: API Key Storage
 * **Decision:** Plain `localStorage` for Phase 1. Add a backlog item to upgrade to client-side encryption.
 * **Justification:** While `localStorage` is vulnerable to XSS-based theft, implementing client-side encryption (using AES-GCM via the browser's Web Crypto API with a user-supplied master password) adds user workflow friction (entering a password on startup) and development overhead. We prioritize rapid prototype validation in Phase 1 and log the security upgrade for the next release.
-* **Mitigation:** The application will not load any external third-party script CDN files, minimizing the vectors for client-side XSS injection.
+* **Mitigation:** Core AI gateway integrations do not rely on third-party scripts or SDKs. PDF/DOCX parser CDN loading is explicit and blocked while privacy mode is active.

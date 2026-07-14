@@ -25,6 +25,20 @@ export const GrammarWorkspace: React.FC = () => {
   const [output, setOutput] = useState('')
   const [copied, setCopied] = useState(false)
 
+  React.useEffect(() => {
+    const reload = localStorage.getItem('omnibox-grammar-reload')
+    if (reload) {
+      try {
+        const parsed = JSON.parse(reload)
+        setInput(typeof parsed === 'string' ? parsed : JSON.stringify(parsed))
+      } catch {
+        setInput(reload)
+      }
+      localStorage.removeItem('omnibox-grammar-reload')
+    }
+  }, [])
+
+
   // Tone Shift sliders (0 - 100)
   const [toneSliders, setToneSliders] = useState({
     diplomatic: 50,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import * as webLLM from '@mlc-ai/web-llm'
+import { PROVIDER_DEFAULT_MODELS, isSupportedWebLLMModel } from '../config/providers'
 
 // Cache the loaded model engine in memory to prevent reloading it on every hook mount
 let cachedEngine: webLLM.MLCEngineInterface | null = null
@@ -37,12 +38,21 @@ export function useWebLLM(): WebLLMHook {
   }, [])
 
   const loadModel = async (modelId: string): Promise<webLLM.MLCEngineInterface | null> => {
+    const resolvedModelId = isSupportedWebLLMModel(modelId)
+      ? modelId
+      : PROVIDER_DEFAULT_MODELS.webgpu
+
     if (!isSupported) {
       setError('WebGPU is not supported on this browser or device hardware.')
       return null
     }
 
-    if (cachedEngine && cachedModelId === modelId) {
+    if (!isSupportedWebLLMModel(resolvedModelId)) {
+      setError(`Unsupported WebLLM model: ${modelId}`)
+      return null
+    }
+
+    if (cachedEngine && cachedModelId === resolvedModelId) {
       return cachedEngine
     }
 
@@ -54,7 +64,7 @@ export function useWebLLM(): WebLLMHook {
 
     try {
       // Create the MLC Engine instance
-      const engine = await webLLM.CreateMLCEngine(modelId, {
+      const engine = await webLLM.CreateMLCEngine(resolvedModelId, {
         initProgressCallback: (report) => {
           setLoadProgress(report.text)
           
@@ -73,7 +83,7 @@ export function useWebLLM(): WebLLMHook {
       })
 
       cachedEngine = engine
-      cachedModelId = modelId
+      cachedModelId = resolvedModelId
       setIsLoading(false)
       setLoadProgress('Model loaded successfully.')
       setLoadPercent(100)
@@ -93,9 +103,13 @@ export function useWebLLM(): WebLLMHook {
     onChunk?: (text: string) => void
   ): Promise<string> => {
     try {
+      const resolvedModelId = isSupportedWebLLMModel(modelId)
+        ? modelId
+        : PROVIDER_DEFAULT_MODELS.webgpu
+
       let engine = cachedEngine
-      if (!engine || cachedModelId !== modelId) {
-        engine = await loadModel(modelId)
+      if (!engine || cachedModelId !== resolvedModelId) {
+        engine = await loadModel(resolvedModelId)
       }
       if (!engine) {
         throw new Error('WebLLM engine failed to initialize.')

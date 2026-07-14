@@ -4,6 +4,30 @@
 
 ---
 
+## Current Status — 2026-07-13
+
+The core refactor and follow-up hardening work are implemented in the current working tree:
+
+- App shell is decomposed into layout components and feature workspaces.
+- Settings and UI state are split into Zustand stores with persisted configuration.
+- Streaming is modularized under `src/services/streaming/`.
+- Grammar and Career workspaces use shared inference/provider components.
+- Activity History is implemented under `src/features/history/` with defensive reload and legacy payload handling.
+- Career CV upload supports TXT/MD offline and blocks PDF/DOCX CDN parser loading while privacy mode is active.
+- Settings mobile clipping is addressed with mobile-first single-column controls and constrained inputs.
+- Light mode has semantic header/sidebar/provider/status coverage plus compatibility overrides for existing surfaces.
+- WebLLM model options now use supported prebuilt IDs, a balanced default, and metadata for tier, VRAM, context, recommendations, and warnings.
+- Root agent instructions are shortened and detailed project guidance lives under `.agents/`.
+- Durable implementation plans live under `docs/plans/`.
+
+Remaining follow-up:
+
+- Add formal unit/component tests if the project adopts a test runner.
+- Consider code-splitting large bundles; Vite currently emits a large chunk advisory during build.
+- Consider vendoring PDF/DOCX parser libraries with lazy dynamic imports if privacy-mode document parsing becomes a requirement.
+
+---
+
 ## 1. Project Folder Structure (Target State)
 
 After all refactoring steps, the `src/` tree should look like this:

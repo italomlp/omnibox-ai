@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSettingsStore } from '../store/useSettingsStore'
+import { PROVIDER_DEFAULT_MODELS, isSupportedWebLLMModel } from '../config/providers'
 import type { ProviderId } from '../config/providers'
 import { streamLLM } from '../services/streaming'
 import { useWebLLM } from './useWebLLM'
@@ -31,6 +32,13 @@ export interface UseInferenceReturn {
 export function useInference(): UseInferenceReturn {
   const settings = useSettingsStore()
   const webLLM = useWebLLM()
+  const {
+    apiKeys,
+    baseUrls,
+    selectedModels,
+    setSelectedModel: persistSelectedModel,
+    privacyMode,
+  } = settings
 
   const [activeProvider, setActiveProvider] = useState<ProviderId>('webgpu')
   const [selectedModel, setSelectedModel] = useState('')
@@ -40,8 +48,8 @@ export function useInference(): UseInferenceReturn {
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Compute available providers based on Privacy Mode
-  const availableProviders = (Object.keys(settings.apiKeys) as ProviderId[]).filter((prov) => {
-    if (settings.privacyMode) {
+  const availableProviders = (Object.keys(apiKeys) as ProviderId[]).filter((prov) => {
+    if (privacyMode) {
       return prov === 'webgpu' || prov === 'ollama'
     }
     return prov !== 'webgpu' // Cloud providers
@@ -49,22 +57,27 @@ export function useInference(): UseInferenceReturn {
 
   // Ensure WebGPU is always available as Tier 1 if privacy mode is off,
   // or limit to local options if privacy mode is on.
-  const providersToUse: ProviderId[] = settings.privacyMode
+  const providersToUse: ProviderId[] = privacyMode
     ? ['webgpu', 'ollama']
     : ['webgpu', ...availableProviders]
 
   // Enforce privacy mode constraints on the active provider
   useEffect(() => {
-    if (settings.privacyMode && activeProvider !== 'webgpu' && activeProvider !== 'ollama') {
+    if (privacyMode && activeProvider !== 'webgpu' && activeProvider !== 'ollama') {
       setActiveProvider('webgpu')
     }
-  }, [settings.privacyMode, activeProvider])
+  }, [privacyMode, activeProvider])
 
   // Sync selectedModel when activeProvider changes
   useEffect(() => {
-    const savedModel = settings.selectedModels[activeProvider]
+    const savedModel = selectedModels[activeProvider]
+    if (activeProvider === 'webgpu' && !isSupportedWebLLMModel(savedModel)) {
+      setSelectedModel(PROVIDER_DEFAULT_MODELS.webgpu)
+      persistSelectedModel('webgpu', PROVIDER_DEFAULT_MODELS.webgpu)
+      return
+    }
     setSelectedModel(savedModel || '')
-  }, [activeProvider, settings.selectedModels])
+  }, [activeProvider, selectedModels, persistSelectedModel])
 
   const abort = () => {
     if (abortControllerRef.current) {
@@ -113,8 +126,8 @@ export function useInference(): UseInferenceReturn {
         opts.onComplete(result)
       } else {
         const providerConfig = {
-          apiKey: settings.apiKeys[activeProvider],
-          baseUrl: settings.baseUrls[activeProvider],
+          apiKey: apiKeys[activeProvider],
+          baseUrl: baseUrls[activeProvider],
           selectedModel: selectedModel,
         }
 

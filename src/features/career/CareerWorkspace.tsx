@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { Briefcase, Eye, Save, Trash, ArrowRight, Loader2, Sparkles, History } from 'lucide-react'
+import { Briefcase, Eye, Save, Trash, ArrowRight, Loader2, Sparkles, History, Upload } from 'lucide-react'
 import { useInference } from '../../hooks/useInference'
+import { extractTextFromPdf, extractTextFromDocx } from '../../utils/pdfParser'
 import { db } from '../../db/db'
 import { ProviderSelector } from '../../components/shared/ProviderSelector'
 import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
 import { ErrorAlert } from '../../components/shared/ErrorAlert'
+import { useSettingsStore } from '../../store/useSettingsStore'
 
 export const CareerWorkspace: React.FC = () => {
   const inference = useInference()
+  const privacyMode = useSettingsStore((state) => state.privacyMode)
   const {
     activeProvider,
     setActiveProvider,
@@ -24,6 +27,70 @@ export const CareerWorkspace: React.FC = () => {
   const [resumeText, setResumeText] = useState('')
   const [jobDescText, setJobDescText] = useState('')
   const [resumeName, setResumeName] = useState('My Resume')
+
+  // File parsing states
+  const [fileParsingStatus, setFileParsingStatus] = useState('')
+  const [fileParsingError, setFileParsingError] = useState('')
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setFileParsingStatus('Initializing parser...')
+    setFileParsingError('')
+    try {
+      const extension = file.name.split('.').pop()?.toLowerCase()
+      let parsedText = ''
+
+      if (extension === 'pdf') {
+        parsedText = await extractTextFromPdf(file, setFileParsingStatus, {
+          allowExternalLibraries: !privacyMode,
+        })
+      } else if (extension === 'docx') {
+        parsedText = await extractTextFromDocx(file, setFileParsingStatus, {
+          allowExternalLibraries: !privacyMode,
+        })
+      } else if (extension === 'txt' || extension === 'md') {
+        setFileParsingStatus('Reading text file...')
+        parsedText = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (event) => resolve(event.target?.result as string || '')
+          reader.onerror = (err) => reject(err)
+          reader.readAsText(file)
+        })
+        setFileParsingStatus('Reading complete.')
+      } else {
+        throw new Error('Unsupported file format. Please upload a PDF, DOCX, TXT, or Markdown file.')
+      }
+
+      setResumeText(parsedText)
+      const baseName = file.name.replace(/\.[^/.]+$/, "")
+      setResumeName(baseName)
+
+      // Save parsed document to IndexedDB
+      const existing = await db.documents.where('name').equals(baseName).first()
+      if (existing) {
+        await db.documents.update(existing.id!, {
+          content: parsedText,
+          timestamp: Date.now(),
+        })
+      } else {
+        await db.documents.add({
+          name: baseName,
+          content: parsedText,
+          timestamp: Date.now(),
+        })
+      }
+      loadStoredData()
+      setTimeout(() => setFileParsingStatus(''), 2000)
+    } catch (err) {
+      console.error(err)
+      const message = err instanceof Error ? err.message : 'Failed to parse the selected file.'
+      setFileParsingError(message)
+      setFileParsingStatus('Parsing failed.')
+      setTimeout(() => setFileParsingStatus(''), 4000)
+    }
+  }
   
   // States
   const [output, setOutput] = useState('')
@@ -51,7 +118,27 @@ export const CareerWorkspace: React.FC = () => {
 
   useEffect(() => {
     loadStoredData()
+
+    // Check if we need to reload a previous run
+    const reload = localStorage.getItem('omnibox-career-reload')
+    if (reload) {
+      try {
+        const parsed: unknown = JSON.parse(reload)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const reloadPayload = parsed as Record<string, unknown>
+          if (typeof reloadPayload.resume === 'string') setResumeText(reloadPayload.resume)
+          if (typeof reloadPayload.jobDesc === 'string') setJobDescText(reloadPayload.jobDesc)
+        } else {
+          setResumeText(reload)
+        }
+      } catch (e) {
+        console.error('Failed to parse reloaded career state:', e)
+        setResumeText(reload)
+      }
+      localStorage.removeItem('omnibox-career-reload')
+    }
   }, [])
+
 
   const handleSaveResume = async () => {
     if (!resumeText.trim()) return
@@ -215,12 +302,24 @@ Ensure you list at least 6 core requirements from the job description. If a requ
                 1. Candidate Resume / CV
               </h3>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* File picker */}
+                <label className="flex items-center gap-1.5 py-1 px-2.5 rounded bg-zinc-900 border border-zinc-850 hover:border-zinc-700 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer">
+                  <Upload className="w-3 h-3 flex-shrink-0" />
+                  Upload CV (PDF/DOCX)
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.txt,.md"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+
                 <input
                   type="text"
                   value={resumeName}
                   onChange={(e) => setResumeName(e.target.value)}
-                  className="text-xs bg-zinc-950 border border-zinc-800 rounded py-1 px-2 text-zinc-300 w-32 focus:outline-none focus:border-indigo-500"
+                  className="text-xs bg-zinc-950 border border-zinc-800 rounded py-1 px-2 text-zinc-300 w-28 focus:outline-none focus:border-indigo-500"
                   placeholder="Document Name"
                 />
                 <button
@@ -232,6 +331,19 @@ Ensure you list at least 6 core requirements from the job description. If a requ
                 </button>
               </div>
             </div>
+
+            {/* Parsing status bar */}
+            {fileParsingStatus && (
+              <div className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1.5 py-1 border-b border-zinc-900 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" /> {fileParsingStatus}
+              </div>
+            )}
+
+            {fileParsingError && (
+              <div className="text-[11px] text-amber-300 bg-amber-950/20 border border-amber-900/30 rounded-lg px-3 py-2 leading-relaxed">
+                {fileParsingError}
+              </div>
+            )}
 
             {/* Load Saved Resume List */}
             {savedResumes.length > 0 && (
@@ -281,8 +393,34 @@ Ensure you list at least 6 core requirements from the job description. If a requ
         {/* Right Side: Output Preview & Controls */}
         <div className="flex flex-col space-y-4">
           {/* Action Trigger Deck */}
-          <div className="p-4 rounded-xl border border-zinc-800/40 glass-panel space-y-3">
+          <div className="p-4 rounded-xl border border-zinc-800/40 glass-panel space-y-3.5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">3. Run Career Diagnostics</h3>
+
+            {/* a11y-compliant Tool Definitions Card */}
+            <div
+              role="region"
+              aria-label="Diagnostics tool definitions"
+              className="p-3.5 rounded-lg bg-zinc-950/40 border border-zinc-850/50 text-[11px] text-zinc-400 space-y-2.5"
+            >
+              <h4 id="diagnostics-info-title" className="font-semibold text-zinc-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Diagnostic Scope & Capabilities
+              </h4>
+              <dl className="grid gap-3 sm:grid-cols-3 leading-relaxed">
+                <div>
+                  <dt className="font-bold text-zinc-200 uppercase tracking-wider text-[9px] mb-0.5">ATS Audit</dt>
+                  <dd>Simulates parser rules to detect formatting blockers (tables, columns) and keyword matching density to pass initial HR filters.</dd>
+                </div>
+                <div>
+                  <dt className="font-bold text-zinc-200 uppercase tracking-wider text-[9px] mb-0.5">Semantic Suitability</dt>
+                  <dd>Evaluates leadership seniority, leveling, and achievement scope against role expectations (goes beyond direct keyword matching).</dd>
+                </div>
+                <div>
+                  <dt className="font-bold text-zinc-200 uppercase tracking-wider text-[9px] mb-0.5">Gap Analysis Matrix</dt>
+                  <dd>Maps every core job requirement to resume evidence side-by-side, identifying exact omissions and recommending specific bullet reframes.</dd>
+                </div>
+              </dl>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <button
                 onClick={runAtsAudit}

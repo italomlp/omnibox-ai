@@ -5,7 +5,7 @@ import { PROVIDER_MODELS_LIST, PROVIDER_DEFAULT_MODELS } from './config/provider
 import { AppSidebar } from './components/layout/AppSidebar'
 import { AppHeader } from './components/layout/AppHeader'
 import { WorkspaceRouter } from './components/layout/WorkspaceRouter'
-import { Sparkles, Briefcase, Settings } from 'lucide-react'
+import { Sparkles, Briefcase, Settings, History } from 'lucide-react'
 
 const App: React.FC = () => {
   const settings = useSettingsStore()
@@ -22,10 +22,7 @@ const App: React.FC = () => {
   // Auto-upgrade invalid or low-end cached model configs from localStorage to Gemma-2B
   useEffect(() => {
     const activeWebGpuModel = settings.selectedModels.webgpu
-    if (
-      activeWebGpuModel === 'Llama-3.2-1B-Instruct-q4f16_1-MLC' ||
-      !PROVIDER_MODELS_LIST.webgpu.includes(activeWebGpuModel)
-    ) {
+    if (!PROVIDER_MODELS_LIST.webgpu.includes(activeWebGpuModel)) {
       settings.setSelectedModel('webgpu', PROVIDER_DEFAULT_MODELS.webgpu)
     }
   }, [settings])
@@ -33,10 +30,23 @@ const App: React.FC = () => {
   const workspaces = [
     { id: 'grammar', name: 'Grammar & Tone', icon: Sparkles, desc: 'Proofread & style shifters' },
     { id: 'career', name: 'Career Suite', icon: Briefcase, desc: 'ATS audits & job matrix gap analysis' },
+    { id: 'history', name: 'Activity History', icon: History, desc: 'Past prompt logs & responses' },
     { id: 'settings', name: 'API Settings', icon: Settings, desc: 'BYOK credentials & models' },
   ]
 
+
   const activeWorkspaceName = workspaces.find((w) => w.id === ui.activeWorkspace)?.name || 'OmniBox AI'
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const root = window.document.documentElement
+      if (ui.theme === 'light') {
+        root.classList.add('light')
+      } else {
+        root.classList.remove('light')
+      }
+    }
+  }, [ui.theme])
 
   return (
     <div className="flex min-h-screen bg-zinc-950 text-zinc-100 antialiased font-sans">
@@ -58,7 +68,7 @@ const App: React.FC = () => {
           onToggleSidebar={ui.toggleSidebar}
         />
 
-        <main className="flex-1 p-6 overflow-y-auto select-none">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto select-none">
           <div className="mx-auto max-w-5xl">
             <WorkspaceRouter activeWorkspace={ui.activeWorkspace} />
           </div>
@@ -67,5 +77,6 @@ const App: React.FC = () => {
     </div>
   )
 }
+
 
 export default App

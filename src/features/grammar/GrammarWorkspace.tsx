@@ -134,7 +134,7 @@ export const GrammarWorkspace: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Workspace Header Panel */}
-      <div className="surface-nested flex flex-col items-stretch justify-between gap-4 rounded-xl border border-zinc-800/40 p-4 md:flex-row md:items-center">
+      <div className="surface-nested flex flex-col items-stretch justify-start gap-4 rounded-xl border border-zinc-800/40 p-4">
         <div className="min-w-0 flex-1">
           <h2 className="flex min-w-0 items-center gap-2 text-lg font-bold text-zinc-100">
             <Sparkles className="w-5 h-5 text-indigo-400" />
@@ -146,7 +146,7 @@ export const GrammarWorkspace: React.FC = () => {
         </div>
 
         {/* Local model configurations bar */}
-        <div className="w-full min-w-0 md:w-auto md:flex-none">
+        <div className="w-full min-w-0">
           <ProviderSelector
             activeProvider={activeProvider}
             onProviderChange={setActiveProvider}

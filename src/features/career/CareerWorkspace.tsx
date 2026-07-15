@@ -328,7 +328,7 @@ Output a structured executive evaluation. Use markdown format. Include sections:
   return (
     <div className="space-y-6">
       {/* Workspace Header Panel */}
-      <div className="surface-nested flex flex-col items-stretch justify-between gap-4 rounded-xl border border-zinc-800/40 p-4 md:flex-row md:items-center">
+      <div className="surface-nested flex flex-col items-stretch justify-start gap-4 rounded-xl border border-zinc-800/40 p-4">
         <div className="min-w-0 flex-1">
           <h2 className="flex min-w-0 items-center gap-2 text-lg font-bold text-zinc-100">
             <Briefcase className="w-5 h-5 text-indigo-400" />
@@ -340,7 +340,7 @@ Output a structured executive evaluation. Use markdown format. Include sections:
         </div>
 
         {/* Local model configurations bar */}
-        <div className="w-full min-w-0 md:w-auto md:flex-none">
+        <div className="w-full min-w-0">
           <ProviderSelector
             activeProvider={activeProvider}
             onProviderChange={setActiveProvider}
@@ -378,36 +378,42 @@ Output a structured executive evaluation. Use markdown format. Include sections:
                 1. Candidate Resume / CV
               </h3>
 
-              <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-1 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end">
-                {/* File picker */}
-                <label className="button-secondary control-touch w-full cursor-pointer select-none text-[10px] text-indigo-400 hover:text-indigo-300 sm:w-auto">
-                  <Upload className="w-3 h-3 flex-shrink-0" />
-                  Upload CV (PDF/DOCX)
-                  <input
-                    type="file"
-                    accept=".pdf,.docx,.txt,.md"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
+              <div className="flex w-full min-w-0 flex-col gap-2 sm:max-w-md sm:flex-none">
+                {/* Line 1 (Top) */}
+                <div className="flex w-full justify-end">
+                  {/* File picker */}
+                  <label className="button-secondary control-touch w-full cursor-pointer select-none text-[10px] text-indigo-400 hover:text-indigo-300 sm:w-auto">
+                    <Upload className="w-3 h-3 flex-shrink-0" />
+                    Upload CV (PDF/DOCX)
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.txt,.md"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
 
-                <input
-                  type="text"
-                  value={resumeName}
-                  onChange={(e) => setResumeName(e.target.value)}
-                  aria-label="Resume document name"
-                  className="control-standard model-control min-w-0 w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 sm:w-40 sm:flex-1"
-                  placeholder="Document Name"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveResume}
-                  className="button-icon self-start text-zinc-300 hover:text-zinc-100 sm:self-auto"
-                  title="Save CV content to database"
-                  aria-label="Save CV content to database"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                </button>
+                {/* Line 2 (Bottom) */}
+                <div className="flex w-full items-center gap-2">
+                  <input
+                    type="text"
+                    value={resumeName}
+                    onChange={(e) => setResumeName(e.target.value)}
+                    aria-label="Resume document name"
+                    className="control-standard model-control min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300"
+                    placeholder="Document Name"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveResume}
+                    className="button-icon flex-shrink-0 text-zinc-300 hover:text-zinc-100"
+                    title="Save CV content to database"
+                    aria-label="Save CV content to database"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
 

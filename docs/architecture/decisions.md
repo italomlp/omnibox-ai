@@ -12,9 +12,9 @@ This document outlines the core technical architecture decisions, justifications
 ---
 
 ## 2. Navigation & Workspace Switcher
-* **Decision:** State-based Workspace Switcher (using Zustand).
-* **Justification:** Since OmniBox AI is designed as a high-density utility dashboard (similar to a desktop app with a sidebar and main panel), nested URL routes are unnecessary. Implementing a state-driven workspace switcher avoids router bundle weight, routing compiler steps, and the classic "404 on page refresh" issue when hosting SPA routes on static hosting environments like GitHub Pages.
-* **Implications:** The active workspace is tracked as a single string ID in the global store. Transitioning between tools is instant and does not trigger page reloads or URL history rewrites.
+* **Decision:** State-based workspace switching with a workspace query parameter (`?workspace=`) layered on top of Zustand.
+* **Justification:** OmniBox AI remains a compact client-side dashboard, so nested routes are unnecessary, but a canonical workspace query makes each view linkable and keeps browser back/forward behavior in sync without adding a router dependency.
+* **Implications:** The active workspace is tracked as a validated workspace ID in the global store. URL changes are canonicalized with `history.pushState` / `replaceState` while preserving unrelated query parameters and `location.hash`.
 
 ---
 

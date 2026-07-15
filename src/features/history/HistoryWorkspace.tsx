@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { History, Inbox } from 'lucide-react'
 import { db, type HistoryItem } from '../../db/db'
-import { useUIStore } from '../../store/useUIStore'
+import { isWorkspaceId, type WorkspaceId } from '../../store/useUIStore'
 import { HistoryList } from './HistoryList'
 import { HistoryItemCard } from './HistoryItemCard'
 import { HistoryDetailPanel } from './HistoryDetailPanel'
+
+interface HistoryWorkspaceProps {
+  onNavigateWorkspace: (workspace: WorkspaceId) => void;
+}
 
 const stringifyHistoryInput = (input: unknown): string => {
   if (typeof input === 'string') return input
@@ -56,9 +60,7 @@ const buildCareerReloadPayload = (input: unknown): string => {
   })
 }
 
-export const HistoryWorkspace: React.FC = () => {
-  const ui = useUIStore()
-  
+export const HistoryWorkspace: React.FC<HistoryWorkspaceProps> = ({ onNavigateWorkspace }) => {
   // Database States
   const [logs, setLogs] = useState<HistoryItem[]>([])
   const [selectedLog, setSelectedLog] = useState<HistoryItem | null>(null)
@@ -114,7 +116,11 @@ export const HistoryWorkspace: React.FC = () => {
     }
 
     // Redirect workspace view
-    ui.setActiveWorkspace(log.workspaceId)
+    if (isWorkspaceId(log.workspaceId)) {
+      onNavigateWorkspace(log.workspaceId)
+    } else {
+      onNavigateWorkspace('grammar')
+    }
   }
 
   // Filter & Sort Computations

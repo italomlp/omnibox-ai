@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Cpu, Shield } from 'lucide-react'
+import type { WorkspaceId } from '../../store/useUIStore'
 
 interface WorkspaceItem {
-  id: string;
+  id: WorkspaceId;
   name: string;
   icon: React.ComponentType<{ className?: string }>;
   desc: string;
@@ -10,10 +11,10 @@ interface WorkspaceItem {
 
 interface AppSidebarProps {
   workspaces: WorkspaceItem[];
-  activeWorkspace: string;
+  activeWorkspace: WorkspaceId;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  onSelectWorkspace: (id: string) => void;
+  onSelectWorkspace: (id: WorkspaceId) => void;
   webGpuSupported: boolean | null;
   privacyMode: boolean;
 }

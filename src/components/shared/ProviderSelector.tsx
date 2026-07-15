@@ -2,7 +2,6 @@ import React from 'react'
 import { PROVIDER_MODELS_LIST } from '../../config/providers'
 import type { ProviderId } from '../../config/providers'
 import { WebLLMModelPicker } from './WebLLMModelPicker'
-import { useSettingsStore } from '../../store/useSettingsStore'
 
 interface ProviderSelectorProps {
   activeProvider: ProviderId;
@@ -19,16 +18,14 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   onModelChange,
   availableProviders,
 }) => {
-  const persistSelectedModel = useSettingsStore((state) => state.setSelectedModel)
-
   return (
-    <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-      <div className="flex min-w-0 flex-col space-y-1 sm:w-auto">
+    <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end sm:gap-3">
+      <div className="flex min-w-0 flex-col gap-1 sm:w-auto">
         <label className="text-[10px] text-zinc-500 font-semibold uppercase">Provider</label>
         <select
           value={activeProvider}
           onChange={(e) => onProviderChange(e.target.value as ProviderId)}
-          className="model-control min-w-0 w-full text-xs bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-zinc-300 focus:outline-none focus:border-indigo-500 sm:w-auto"
+          className="control-standard model-control min-w-0 h-9 w-full cursor-pointer rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500 sm:w-56"
         >
           {availableProviders.map((prov) => (
             <option key={prov} value={prov}>
@@ -42,22 +39,22 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         </select>
       </div>
 
-      <div className="flex min-w-0 flex-col space-y-1 sm:w-auto">
+      <div className="flex min-w-0 flex-col gap-1 sm:w-auto">
         <label className="text-[10px] text-zinc-500 font-semibold uppercase">Model</label>
         {activeProvider === 'webgpu' ? (
           <WebLLMModelPicker
             value={selectedModel}
             onChange={(model) => {
               onModelChange(model)
-              persistSelectedModel('webgpu', model)
             }}
-            className="w-full sm:max-w-[28rem]"
+            menuMode="portal"
+            className="w-full min-w-0 sm:max-w-[28rem]"
           />
         ) : (
           <select
             value={selectedModel}
             onChange={(e) => onModelChange(e.target.value)}
-            className="model-control min-w-0 w-full text-xs bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-zinc-300 focus:outline-none focus:border-indigo-500 cursor-pointer sm:w-auto sm:max-w-64"
+            className="control-standard model-control min-w-0 h-9 w-full cursor-pointer rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500 sm:w-64"
           >
             {(() => {
               const list = PROVIDER_MODELS_LIST[activeProvider] || []

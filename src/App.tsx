@@ -1,15 +1,31 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useSettingsStore } from './store/useSettingsStore'
-import { useUIStore } from './store/useUIStore'
+import { useUIStore, type WorkspaceId, isWorkspaceId } from './store/useUIStore'
 import { PROVIDER_MODELS_LIST, PROVIDER_DEFAULT_MODELS } from './config/providers'
 import { AppSidebar } from './components/layout/AppSidebar'
 import { AppHeader } from './components/layout/AppHeader'
 import { WorkspaceRouter } from './components/layout/WorkspaceRouter'
 import { Sparkles, Briefcase, Settings, History } from 'lucide-react'
 
+const WORKSPACE_QUERY_PARAM = 'workspace'
+
+const getWorkspaceFromLocation = (): WorkspaceId | null => {
+  if (typeof window === 'undefined') return null
+
+  const workspace = new URL(window.location.href).searchParams.get(WORKSPACE_QUERY_PARAM)
+  return isWorkspaceId(workspace) ? workspace : null
+}
+
+const buildWorkspaceUrl = (workspace: WorkspaceId) => {
+  const url = new URL(window.location.href)
+  url.searchParams.set(WORKSPACE_QUERY_PARAM, workspace)
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
 const App: React.FC = () => {
   const settings = useSettingsStore()
   const ui = useUIStore()
+  const { activeWorkspace, setActiveWorkspace } = ui
   const [webGpuSupported, setWebGpuSupported] = useState<boolean | null>(null)
 
   useEffect(() => {
@@ -27,7 +43,7 @@ const App: React.FC = () => {
     }
   }, [settings])
 
-  const workspaces = [
+  const workspaces: Array<{ id: WorkspaceId; name: string; icon: React.ComponentType<{ className?: string }>; desc: string }> = [
     { id: 'grammar', name: 'Grammar & Tone', icon: Sparkles, desc: 'Proofread & style shifters' },
     { id: 'career', name: 'Career Suite', icon: Briefcase, desc: 'ATS audits & job matrix gap analysis' },
     { id: 'history', name: 'Activity History', icon: History, desc: 'Past prompt logs & responses' },
@@ -48,6 +64,40 @@ const App: React.FC = () => {
     }
   }, [ui.theme])
 
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const locationWorkspace = getWorkspaceFromLocation()
+    const canonicalWorkspace = activeWorkspace
+
+    if (locationWorkspace === canonicalWorkspace) return
+
+    window.history.replaceState({ workspace: canonicalWorkspace }, '', buildWorkspaceUrl(canonicalWorkspace))
+  }, [activeWorkspace])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handlePopState = () => {
+      const workspaceFromUrl = getWorkspaceFromLocation() ?? 'grammar'
+      setActiveWorkspace(workspaceFromUrl)
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [setActiveWorkspace])
+
+  const navigateWorkspace = useCallback((workspace: WorkspaceId) => {
+    if (typeof window === 'undefined') return
+
+    if (activeWorkspace === workspace && getWorkspaceFromLocation() === workspace) {
+      return
+    }
+
+    window.history.pushState({ workspace }, '', buildWorkspaceUrl(workspace))
+    setActiveWorkspace(workspace)
+  }, [activeWorkspace, setActiveWorkspace])
+
   return (
     <div className="flex min-h-screen overflow-x-clip bg-zinc-950 text-zinc-100 antialiased font-sans">
       <AppSidebar
@@ -55,7 +105,7 @@ const App: React.FC = () => {
         activeWorkspace={ui.activeWorkspace}
         sidebarOpen={ui.sidebarOpen}
         onToggleSidebar={ui.toggleSidebar}
-        onSelectWorkspace={ui.setActiveWorkspace}
+        onSelectWorkspace={navigateWorkspace}
         webGpuSupported={webGpuSupported}
         privacyMode={settings.privacyMode}
       />
@@ -70,7 +120,7 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto overflow-x-clip p-4 md:p-6">
           <div className="mx-auto max-w-5xl">
-            <WorkspaceRouter activeWorkspace={ui.activeWorkspace} />
+            <WorkspaceRouter activeWorkspace={ui.activeWorkspace} onNavigateWorkspace={navigateWorkspace} />
           </div>
         </main>
       </div>

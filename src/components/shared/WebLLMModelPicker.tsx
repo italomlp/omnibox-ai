@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Cpu, HardDrive, Sparkles } from 'lucide-react';
 import {
   PROVIDER_DEFAULT_MODELS,
@@ -55,6 +56,7 @@ export interface WebLLMModelPickerProps {
   disabled?: boolean;
   className?: string;
   label?: string;
+  menuMode?: 'flow' | 'portal';
 }
 
 export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
@@ -66,15 +68,18 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
   disabled = false,
   className,
   label = 'WebLLM model',
+  menuMode = 'portal',
 }) => {
   const pickerId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listboxRef = useRef<HTMLDivElement | null>(null);
+  const portalRef = useRef<HTMLDivElement | null>(null);
   const optionRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const previousOpenRef = useRef(false);
+  const [portalStyle, setPortalStyle] = useState<React.CSSProperties | null>(null);
 
   const selectedConfig = useMemo(() => {
     return WEBLLM_MODEL_CONFIGS.find((config) => config.modelId === value) ??
@@ -123,7 +128,8 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
-      if (!target || !rootRef.current || rootRef.current.contains(target)) return;
+      if (!target) return;
+      if (rootRef.current?.contains(target) || portalRef.current?.contains(target)) return;
       setIsOpen(false);
     };
 
@@ -150,6 +156,66 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
     const option = optionRefs.current[activeIndex];
     option?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || menuMode !== 'portal') {
+      setPortalStyle(null);
+      return;
+    }
+
+    let rafId = 0;
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      const menu = portalRef.current;
+      if (!trigger || !menu) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const gap = 8;
+      const inset = 12;
+      const width = rect.width;
+      const maxHeightBelow = Math.max(160, viewportHeight - rect.bottom - gap - inset);
+      const maxHeightAbove = Math.max(160, rect.top - gap - inset);
+      const placeAbove = maxHeightBelow < 220 && maxHeightAbove > maxHeightBelow;
+      const left = Math.min(Math.max(rect.left, inset), Math.max(inset, viewportWidth - width - inset));
+
+      setPortalStyle({
+        position: 'fixed',
+        left,
+        width,
+        zIndex: 'var(--layer-popover40)',
+        ...(placeAbove
+          ? {
+              bottom: Math.max(inset, viewportHeight - rect.top + gap),
+              maxHeight: `calc(100dvh - ${Math.max(inset, viewportHeight - rect.top + gap)}px - ${inset}px)`,
+            }
+          : {
+              top: rect.bottom + gap,
+              maxHeight: `calc(100dvh - ${rect.bottom + gap}px - ${inset}px)`,
+            }),
+      });
+    };
+
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updatePosition);
+    };
+
+    scheduleUpdate();
+    window.addEventListener('resize', scheduleUpdate);
+    window.addEventListener('scroll', scheduleUpdate, true);
+    window.visualViewport?.addEventListener('resize', scheduleUpdate);
+    window.visualViewport?.addEventListener('scroll', scheduleUpdate);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', scheduleUpdate);
+      window.removeEventListener('scroll', scheduleUpdate, true);
+      window.visualViewport?.removeEventListener('resize', scheduleUpdate);
+      window.visualViewport?.removeEventListener('scroll', scheduleUpdate);
+    };
+  }, [isOpen, menuMode]);
 
   useEffect(() => {
     if (previousOpenRef.current && !isOpen) {
@@ -231,6 +297,149 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
       ? `${selectedConfig.label} can attempt ${workspaceActionLabel ?? selectedTaskLabel ?? 'this action'}, but output quality is not guaranteed.`
       : null;
 
+  const menuContent = (
+      <div
+        ref={menuMode === 'portal' ? portalRef : undefined}
+        className={classNames(
+          menuMode === 'portal'
+            ? 'fixed left-0 top-0 layer-popover40 w-auto'
+            : 'absolute left-0 right-0 top-full layer-popover40 mt-2',
+          'rounded-2xl border border-zinc-800 bg-zinc-950/98 p-2 shadow-2xl shadow-black/40 backdrop-blur'
+        )}
+      style={
+        menuMode === 'portal'
+          ? portalStyle
+            ? { ...portalStyle, visibility: 'visible' }
+            : { visibility: 'hidden' }
+          : undefined
+      }
+    >
+      <div
+        ref={listboxRef}
+        id={`${pickerId}-listbox`}
+        role="listbox"
+        aria-label={label}
+        aria-activedescendant={`${pickerId}-option-${flatConfigs[activeIndex]?.modelId ?? selectedConfig.modelId}`}
+        tabIndex={0}
+        onKeyDown={handleListboxKeyDown}
+        className="overflow-auto rounded-xl outline-none"
+        style={menuMode === 'portal' ? { maxHeight: portalStyle?.maxHeight ?? '31rem' } : { maxHeight: '31rem' }}
+      >
+        {configsByTier.map((group) => (
+          <div key={group.tier} className="space-y-2 p-1.5">
+            <div className="flex items-center gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <span>{WEBLLM_TIER_LABELS[group.tier]}</span>
+              <span className="h-px flex-1 bg-zinc-800/80" />
+            </div>
+
+            <div className="space-y-1.5">
+              {group.models.map((config) => {
+                const index = flatConfigs.findIndex((item) => item.modelId === config.modelId);
+                const isSelected = config.modelId === selectedConfig.modelId;
+                const isActive = index === activeIndex;
+
+                return (
+                  <div
+                    key={config.modelId}
+                    id={`${pickerId}-option-${config.modelId}`}
+                    ref={(node) => {
+                      optionRefs.current[index] = node;
+                    }}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => selectModel(config.modelId)}
+                    className={classNames(
+                      'cursor-pointer rounded-xl border px-3 py-3 text-left transition-colors',
+                      isActive
+                        ? 'border-indigo-500/40 bg-indigo-500/10'
+                        : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900/80',
+                      isSelected && 'ring-1 ring-inset ring-indigo-500/30'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="min-w-0 truncate text-sm font-medium text-zinc-100">{config.label}</span>
+                          <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">
+                            {config.family}
+                          </span>
+                          <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">
+                            {config.parameterCount}
+                          </span>
+                        </div>
+
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-400">
+                          <span className="inline-flex items-center gap-1">
+                            <Cpu className="h-3 w-3" />
+                            {formatMemoryMB(config.recommendedAvailableMemoryMB)} available GPU/shared memory
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <HardDrive className="h-3 w-3" />
+                            {config.recommendedSystemMemoryGB} GB RAM
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="flex flex-shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                        {isSelected ? <Check className="h-3.5 w-3.5 text-indigo-400" /> : null}
+                        <span>{WEBLLM_TIER_LABELS[config.tier]}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {WEBLLM_TASK_KEYS.map((task) => {
+                        const status = config.taskSupport[task];
+                        return (
+                          <span
+                            key={task}
+                            className={classNames(
+                              'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                              getTaskBadgeClass(status)
+                            )}
+                          >
+                            {WEBLLM_TASK_LABELS[task]}: {WEBLLM_TASK_SUPPORT_LABELS[status]}
+                          </span>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-zinc-400">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5">
+                        <Sparkles className="h-3 w-3" />
+                        Download {formatDownloadSize(config.downloadSizeMB)}
+                      </span>
+                      <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5">
+                        Context {config.contextWindow.toLocaleString()} tokens
+                      </span>
+                      <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5">
+                        Max input {config.maxRecommendedInputTokens.toLocaleString()} tokens
+                      </span>
+                      {config.requiredWebGpuFeatures?.map((feature) => (
+                        <span
+                          key={feature}
+                          className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-amber-300"
+                        >
+                          Requires {feature}
+                        </span>
+                      ))}
+                      {config.warning ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-rose-300">
+                          <AlertTriangle className="h-3 w-3" />
+                          {config.warning}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div ref={rootRef} className={classNames('relative w-full min-w-0 space-y-3', className)}>
       <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
@@ -276,132 +485,7 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
         </div>
       </button>
 
-      {isOpen ? (
-        <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-zinc-800 bg-zinc-950/98 p-2 shadow-2xl shadow-black/40 backdrop-blur">
-          <div
-            ref={listboxRef}
-            id={`${pickerId}-listbox`}
-            role="listbox"
-            aria-label={label}
-            aria-activedescendant={`${pickerId}-option-${flatConfigs[activeIndex]?.modelId ?? selectedConfig.modelId}`}
-            tabIndex={0}
-            onKeyDown={handleListboxKeyDown}
-            className="max-h-[31rem] overflow-auto rounded-xl outline-none"
-          >
-            {configsByTier.map((group) => (
-              <div key={group.tier} className="space-y-2 p-1.5">
-                <div className="flex items-center gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                  <span>{WEBLLM_TIER_LABELS[group.tier]}</span>
-                  <span className="h-px flex-1 bg-zinc-800/80" />
-                </div>
-
-                <div className="space-y-1.5">
-                  {group.models.map((config) => {
-                    const index = flatConfigs.findIndex((item) => item.modelId === config.modelId);
-                    const isSelected = config.modelId === selectedConfig.modelId;
-                    const isActive = index === activeIndex;
-
-                    return (
-                      <div
-                        key={config.modelId}
-                        id={`${pickerId}-option-${config.modelId}`}
-                        ref={(node) => {
-                          optionRefs.current[index] = node;
-                        }}
-                        role="option"
-                        aria-selected={isSelected}
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => selectModel(config.modelId)}
-                        className={classNames(
-                          'cursor-pointer rounded-xl border px-3 py-3 text-left transition-colors',
-                          isActive
-                            ? 'border-indigo-500/40 bg-indigo-500/10'
-                            : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900/80',
-                          isSelected && 'ring-1 ring-inset ring-indigo-500/30'
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                              <span className="min-w-0 truncate text-sm font-medium text-zinc-100">{config.label}</span>
-                              <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">
-                                {config.family}
-                              </span>
-                              <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">
-                                {config.parameterCount}
-                              </span>
-                            </div>
-
-                            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-400">
-                              <span className="inline-flex items-center gap-1">
-                                <Cpu className="h-3 w-3" />
-                                {formatMemoryMB(config.recommendedAvailableMemoryMB)} available GPU/shared memory
-                              </span>
-                              <span className="inline-flex items-center gap-1">
-                                <HardDrive className="h-3 w-3" />
-                                {config.recommendedSystemMemoryGB} GB RAM
-                              </span>
-                            </p>
-                          </div>
-
-                          <div className="flex flex-shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-                            {isSelected ? <Check className="h-3.5 w-3.5 text-indigo-400" /> : null}
-                            <span>{WEBLLM_TIER_LABELS[config.tier]}</span>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {WEBLLM_TASK_KEYS.map((task) => {
-                            const status = config.taskSupport[task];
-                            return (
-                              <span
-                                key={task}
-                                className={classNames(
-                                  'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                                  getTaskBadgeClass(status)
-                                )}
-                              >
-                                {WEBLLM_TASK_LABELS[task]}: {WEBLLM_TASK_SUPPORT_LABELS[status]}
-                              </span>
-                            );
-                          })}
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-zinc-400">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5">
-                            <Sparkles className="h-3 w-3" />
-                            Download {formatDownloadSize(config.downloadSizeMB)}
-                          </span>
-                          <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5">
-                            Context {config.contextWindow.toLocaleString()} tokens
-                          </span>
-                          <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5">
-                            Max input {config.maxRecommendedInputTokens.toLocaleString()} tokens
-                          </span>
-                          {config.requiredWebGpuFeatures?.map((feature) => (
-                            <span
-                              key={feature}
-                              className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-amber-300"
-                            >
-                              Requires {feature}
-                            </span>
-                          ))}
-                          {config.warning ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-rose-300">
-                              <AlertTriangle className="h-3 w-3" />
-                              {config.warning}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      {isOpen ? (menuMode === 'portal' ? createPortal(menuContent, document.body) : menuContent) : null}
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3 text-xs text-zinc-400">
         <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">

@@ -197,18 +197,10 @@ export const SettingsPanel: React.FC = () => {
                     <span className="min-w-0 truncate">{p.name}</span>
                   </h3>
                   
-                  {/* Custom Model Selector Inputs */}
-                  <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:w-auto">
-                    <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
-                      <label className="text-[10px] text-zinc-500 font-semibold uppercase">Suggestion:</label>
-                      {isWebGPU ? (
-                        <WebLLMModelPicker
-                          value={selectedModels[p.id]}
-                          onChange={(model) => setSelectedModel(p.id, model)}
-                          className="w-full sm:max-w-[32rem]"
-                          label="WebLLM model"
-                        />
-                      ) : (
+                  {!isWebGPU ? (
+                    <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:w-auto">
+                      <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
+                        <label className="text-[10px] text-zinc-500 font-semibold uppercase">Suggestion:</label>
                         <select
                           value={
                             PROVIDER_MODELS_LIST[p.id].includes(selectedModels[p.id])
@@ -230,16 +222,10 @@ export const SettingsPanel: React.FC = () => {
                           ))}
                           <option value="custom">Custom (Type below)</option>
                         </select>
-                      )}
-                    </div>
+                      </div>
 
-                    <div className="flex w-full min-w-0 flex-col gap-1 sm:min-w-0 sm:flex-1 sm:flex-row sm:items-center sm:gap-1.5 lg:w-64">
-                      <label className="text-[10px] text-zinc-500 font-semibold uppercase">Active ID:</label>
-                      {isWebGPU ? (
-                        <code className="model-control min-w-0 w-full flex-1 truncate rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-300 font-mono">
-                          {_selectedWebLLMConfig?.modelId ?? PROVIDER_DEFAULT_MODELS.webgpu}
-                        </code>
-                      ) : (
+                      <div className="flex w-full min-w-0 flex-col gap-1 sm:min-w-0 sm:flex-1 sm:flex-row sm:items-center sm:gap-1.5 lg:w-64">
+                        <label className="text-[10px] text-zinc-500 font-semibold uppercase">Active ID:</label>
                         <input
                           type="text"
                           value={selectedModels[p.id] || ''}
@@ -247,10 +233,34 @@ export const SettingsPanel: React.FC = () => {
                           placeholder="e.g. gpt-5-preview"
                           className="model-control min-w-0 w-full flex-1 rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-300 font-mono"
                         />
-                      )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                {isWebGPU ? (
+                  <div className="mb-3 space-y-3 rounded-xl border border-zinc-800/50 bg-zinc-950/40 p-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                        Preferred WebLLM model
+                      </label>
+                      <WebLLMModelPicker
+                        value={selectedModels.webgpu}
+                        onChange={(model) => setSelectedModel('webgpu', model)}
+                        className="w-full"
+                        label="Preferred WebLLM model"
+                        menuMode="flow"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Selected model ID</p>
+                      <p className="min-w-0 whitespace-normal break-words rounded-lg border border-zinc-800/60 bg-zinc-950/70 px-3 py-2 font-mono text-xs leading-relaxed text-zinc-300 select-text">
+                        {_selectedWebLLMConfig?.modelId ?? PROVIDER_DEFAULT_MODELS.webgpu}
+                      </p>
                     </div>
                   </div>
-                </div>
+                ) : null}
 
                 {isWebGPU && showRawModelDiagnostics && _selectedWebLLMConfig && (
                   <div className="mb-3 grid min-w-0 gap-2 text-[10px] text-zinc-400 sm:grid-cols-3">

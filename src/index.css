@@ -4,6 +4,31 @@ html {
   color-scheme: dark;
   --focus-ring: rgba(99, 102, 241, 0.45);
   --focus-ring-soft: rgba(99, 102, 241, 0.16);
+  --layer-header10: 10;
+  --layer-backdrop20: 20;
+  --layer-sidebar30: 30;
+  --layer-popover40: 40;
+  --layer-modal50: 50;
+}
+
+.layer-header10 {
+  z-index: var(--layer-header10);
+}
+
+.layer-backdrop20 {
+  z-index: var(--layer-backdrop20);
+}
+
+.layer-sidebar30 {
+  z-index: var(--layer-sidebar30);
+}
+
+.layer-popover40 {
+  z-index: var(--layer-popover40);
+}
+
+.layer-modal50 {
+  z-index: var(--layer-modal50);
 }
 
 @theme {

@@ -342,7 +342,10 @@ export function useInference(): UseInferenceReturn {
       throw makeAbortError()
     }
 
-    return webLLM.generate(modelId, userPrompt, systemPrompt, onChunk, generationOptions)
+    return webLLM.generate(modelId, userPrompt, systemPrompt, onChunk, {
+      ...generationOptions,
+      signal,
+    })
   }
 
   const validateStructuredOutput = <TTask extends InferenceTaskId>(
@@ -610,12 +613,15 @@ export function useInference(): UseInferenceReturn {
             if (controller.signal.aborted) return
             opts.onChunk(chunk)
           },
-          buildWebLLMGenerationOptions(
-            opts.temperature ?? 0.3,
-            opts.maxTokens,
-            opts.stopSequences,
-            opts.thinking,
-          ),
+          {
+            ...buildWebLLMGenerationOptions(
+              opts.temperature ?? 0.3,
+              opts.maxTokens,
+              opts.stopSequences,
+              opts.thinking,
+            ),
+            signal: controller.signal,
+          },
         )
 
         if (controller.signal.aborted) return

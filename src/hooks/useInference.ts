@@ -123,6 +123,7 @@ const isCompatibleWebLLMModelForTask = <TTask extends InferenceTaskId>(
 ): boolean => {
   const config = WEBLLM_MODEL_CONFIG_BY_ID[modelId]
   if (!config) {
+    console.warn(`[DEBUG Compatibility] Model config not found for: ${modelId}`)
     return false
   }
 
@@ -130,11 +131,28 @@ const isCompatibleWebLLMModelForTask = <TTask extends InferenceTaskId>(
   const budget = getTaskContextBudget(task, input, { contextWindowTokens: config.contextWindow })
   const taskKey = TASK_SUPPORT_KEY_BY_ID[task]
 
+  const structuredOutputSupported = config.taskSupport.structuredOutput !== 'blocked'
+  const taskSupported = config.taskSupport[taskKey] !== 'blocked'
+  const tierSupported = WEBLLM_TIER_ORDER[config.tier] >= WEBLLM_TIER_ORDER[LOCAL_MINIMUM_TIER_TO_WEBLLM_TIER[taskSpec.minimumLocalTier]]
+  const budgetFits = budget.fits
+
+  if (!structuredOutputSupported || !taskSupported || !tierSupported || !budgetFits) {
+    console.warn(`[DEBUG Compatibility] Model ${modelId} is NOT compatible for task ${task}:`, {
+      structuredOutputSupported,
+      taskSupported,
+      tierSupported,
+      budgetFits,
+      estimatedInputTokens: budget.estimatedInputTokens,
+      availableInputTokens: budget.availableInputTokens,
+      contextWindowTokens: config.contextWindow,
+    })
+  }
+
   return (
-    config.taskSupport.structuredOutput !== 'blocked'
-    && config.taskSupport[taskKey] !== 'blocked'
-    && WEBLLM_TIER_ORDER[config.tier] >= WEBLLM_TIER_ORDER[LOCAL_MINIMUM_TIER_TO_WEBLLM_TIER[taskSpec.minimumLocalTier]]
-    && budget.fits
+    structuredOutputSupported &&
+    taskSupported &&
+    tierSupported &&
+    budgetFits
   )
 }
 

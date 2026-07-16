@@ -197,12 +197,19 @@ export function useWebLLM(): WebLLMHook {
     }
     messages.push({ role: 'user', content: prompt })
 
+    let stopOptions = options?.stopSequences ?? undefined
+    if (stopOptions) {
+      const stopList = Array.isArray(stopOptions) ? stopOptions : [stopOptions]
+      const filteredList = stopList.filter((seq) => !seq.includes('```'))
+      stopOptions = filteredList.length > 0 ? filteredList : undefined
+    }
+
     const request: webLLM.ChatCompletionRequestStreaming = {
       messages,
       stream: true,
       max_tokens: options?.maxTokens ?? undefined,
       temperature: options?.temperature ?? undefined,
-      stop: options?.stopSequences ?? undefined,
+      stop: stopOptions,
       model: resolvedModelId,
     }
 

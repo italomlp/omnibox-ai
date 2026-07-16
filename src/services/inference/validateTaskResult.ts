@@ -51,26 +51,34 @@ function createStrictJsonError(code: StrictJsonErrorCode, message: string): Erro
 }
 
 export function parseStrictJsonObject(rawText: string): Record<string, unknown> {
-  const trimmed = rawText.trim()
+  let trimmed = rawText.trim()
 
   if (!trimmed) {
     throw createStrictJsonError('empty_output', 'Output is empty.')
   }
 
+  // Extract JSON content if wrapped in markdown fences
   if (trimmed.includes('```')) {
-    throw createStrictJsonError('markdown_fence', 'Markdown fences are not allowed.')
+    const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+    if (fenceMatch) {
+      trimmed = fenceMatch[1].trim()
+    } else {
+      trimmed = trimmed.replace(/```/g, '').trim()
+    }
   }
 
   const firstBrace = trimmed.indexOf('{')
   const lastBrace = trimmed.lastIndexOf('}')
 
-  if (firstBrace !== 0 || lastBrace !== trimmed.length - 1) {
-    throw createStrictJsonError('surrounding_text', 'Output must contain exactly one JSON object with no preamble or trailing text.')
+  if (firstBrace === -1 || lastBrace === -1 || firstBrace > lastBrace) {
+    throw createStrictJsonError('surrounding_text', 'Output must contain a valid JSON object.')
   }
+
+  const jsonCandidate = trimmed.substring(firstBrace, lastBrace + 1)
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(trimmed)
+    parsed = JSON.parse(jsonCandidate)
   } catch {
     throw createStrictJsonError('malformed_json', 'Output is not valid JSON.')
   }

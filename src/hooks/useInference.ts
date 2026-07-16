@@ -382,6 +382,8 @@ export function useInference(): UseInferenceReturn {
       signal,
     )
 
+    console.log('[DEBUG Inference] runStructuredForWebLLM primary output:', JSON.stringify(primary))
+
     const validated = validateStructuredOutput(task, input, primary)
     if (validated) {
       return validated

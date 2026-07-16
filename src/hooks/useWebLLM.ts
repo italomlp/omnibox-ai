@@ -163,19 +163,31 @@ export function useWebLLM(): WebLLMHook {
 
     const isAborted = () => abortRequested || Boolean(signal?.aborted)
 
+    console.log('[DEBUG WebLLM] Starting generateLocked:', {
+      modelId,
+      promptLength: prompt.length,
+      systemPromptLength: systemPrompt?.length ?? 0,
+      options,
+      abortRequested,
+      signalAborted: signal?.aborted,
+    })
+
     const resolvedModelId = isSupportedWebLLMModel(modelId)
       ? modelId
       : PROVIDER_DEFAULT_MODELS.webgpu
 
     let engine = cachedEngine
     if (!engine || cachedModelId !== resolvedModelId) {
+      console.log('[DEBUG WebLLM] Loading model:', resolvedModelId)
       engine = await loadModelLocked(resolvedModelId)
     }
     if (!engine) {
+      console.error('[DEBUG WebLLM] Engine failed to initialize')
       throw new Error('WebLLM engine failed to initialize.')
     }
 
     if (isAborted()) {
+      console.warn('[DEBUG WebLLM] Aborted before starting completion')
       throw createAbortError()
     }
 
@@ -201,7 +213,10 @@ export function useWebLLM(): WebLLMHook {
       request.extra_body = { enable_thinking: false }
     }
 
+    console.log('[DEBUG WebLLM] Requesting completion:', request)
+
     const onAbort = () => {
+      console.log('[DEBUG WebLLM] Signal abort event triggered')
       if (engine) {
         void engine.interruptGenerate()
       }
@@ -211,14 +226,19 @@ export function useWebLLM(): WebLLMHook {
 
     try {
       const completion = await engine.chat.completions.create(request)
+      console.log('[DEBUG WebLLM] Completion created:', completion)
 
       let fullText = ''
+      let chunkCount = 0
       for await (const chunk of completion) {
+        chunkCount++
         if (isAborted()) {
+          console.warn('[DEBUG WebLLM] Aborted during completion loop at chunk:', chunkCount)
           throw createAbortError()
         }
 
         const text = chunk.choices[0]?.delta?.content || ''
+        console.log(`[DEBUG WebLLM] Chunk ${chunkCount}:`, JSON.stringify(text))
         if (text) {
           fullText += text
           if (onChunk) {
@@ -227,13 +247,16 @@ export function useWebLLM(): WebLLMHook {
         }
       }
 
+      console.log('[DEBUG WebLLM] Loop finished. Chunks:', chunkCount, 'fullText:', JSON.stringify(fullText))
+
       if (isAborted()) {
+        console.warn('[DEBUG WebLLM] Aborted after completion loop')
         throw createAbortError()
       }
 
       return fullText
     } catch (error: unknown) {
-      console.error('WebLLM generation error:', error)
+      console.error('[DEBUG WebLLM] Generation error:', error)
       setError(getErrorMessage(error, 'Generation failed.'))
       throw error
     } finally {

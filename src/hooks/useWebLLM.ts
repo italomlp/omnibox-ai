@@ -17,6 +17,7 @@ export interface WebLLMGenerationOptions {
   maxTokens?: number
   stopSequences?: string | string[]
   thinking?: boolean
+  signal?: AbortSignal
 }
 
 export interface WebLLMHook {
@@ -156,6 +157,12 @@ export function useWebLLM(): WebLLMHook {
     onChunk?: (text: string) => void,
     options?: WebLLMGenerationOptions
   ): Promise<string> => {
+    // Reset global abort flag for the new generation request
+    abortRequested = false
+    const signal = options?.signal
+
+    const isAborted = () => abortRequested || Boolean(signal?.aborted)
+
     const resolvedModelId = isSupportedWebLLMModel(modelId)
       ? modelId
       : PROVIDER_DEFAULT_MODELS.webgpu
@@ -168,7 +175,7 @@ export function useWebLLM(): WebLLMHook {
       throw new Error('WebLLM engine failed to initialize.')
     }
 
-    if (abortRequested) {
+    if (isAborted()) {
       throw createAbortError()
     }
 
@@ -194,12 +201,20 @@ export function useWebLLM(): WebLLMHook {
       request.extra_body = { enable_thinking: false }
     }
 
+    const onAbort = () => {
+      if (engine) {
+        void engine.interruptGenerate()
+      }
+    }
+
+    signal?.addEventListener('abort', onAbort)
+
     try {
       const completion = await engine.chat.completions.create(request)
 
       let fullText = ''
       for await (const chunk of completion) {
-        if (abortRequested) {
+        if (isAborted()) {
           throw createAbortError()
         }
 
@@ -212,7 +227,7 @@ export function useWebLLM(): WebLLMHook {
         }
       }
 
-      if (abortRequested) {
+      if (isAborted()) {
         throw createAbortError()
       }
 
@@ -222,6 +237,7 @@ export function useWebLLM(): WebLLMHook {
       setError(getErrorMessage(error, 'Generation failed.'))
       throw error
     } finally {
+      signal?.removeEventListener('abort', onAbort)
       abortRequested = false
     }
   }

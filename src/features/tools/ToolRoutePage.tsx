@@ -18,6 +18,10 @@ const RegexInterpreterToolPage = lazy(() =>
   import('../regex/RegexInterpreterToolPage').then((module) => ({ default: module.RegexInterpreterToolPage })),
 )
 
+const SpeechStudioToolPage = lazy(() =>
+  import('../speech/SpeechStudioToolPage').then((module) => ({ default: module.SpeechStudioToolPage })),
+)
+
 const ToolLoadingState: React.FC = () => (
   <div className="flex min-h-[10rem] items-center justify-center rounded-2xl border border-zinc-800/60 bg-zinc-950/60 p-6" role="status" aria-live="polite" aria-label="Loading tool workspace">
     <div className="flex items-center gap-2 text-sm text-zinc-400">
@@ -56,6 +60,14 @@ export const ToolRoutePage: React.FC<ToolRoutePageProps> = ({ toolId, onNavigate
     return (
       <Suspense fallback={<ToolLoadingState />}>
         <RegexInterpreterToolPage />
+      </Suspense>
+    )
+  }
+
+  if (toolId === 'speech-studio') {
+    return (
+      <Suspense fallback={<ToolLoadingState />}>
+        <SpeechStudioToolPage />
       </Suspense>
     )
   }

@@ -7,6 +7,8 @@ interface AppHeaderProps {
   privacyMode: boolean
   sidebarOpen: boolean
   onToggleSidebar: () => void
+  isCommandPaletteOpen: boolean
+  onOpenCommandPalette: () => void
   theme: 'dark' | 'light'
   onToggleTheme: () => void
 }
@@ -17,6 +19,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   privacyMode,
   sidebarOpen,
   onToggleSidebar,
+  isCommandPaletteOpen,
+  onOpenCommandPalette,
   theme,
   onToggleTheme,
 }) => {
@@ -57,11 +61,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         <button
           type="button"
+          onClick={onOpenCommandPalette}
           className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800"
-          aria-label="Command palette coming soon"
+          aria-haspopup="dialog"
+          aria-expanded={isCommandPaletteOpen}
+          aria-label="Open command palette"
         >
           <Command className="h-3.5 w-3.5 text-zinc-500" />
-          Coming soon
+          Command palette
+          <span className="rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[9px] tracking-[0.12em] text-zinc-500">⌘K</span>
         </button>
 
         <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${privacyMode ? 'border-emerald-900/40 bg-emerald-950/20 text-emerald-300' : 'border-zinc-800 bg-zinc-900 text-zinc-300'}`}>

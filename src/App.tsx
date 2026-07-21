@@ -7,10 +7,12 @@ import { AppHeader } from './components/layout/AppHeader'
 import { WorkspaceRouter } from './components/layout/WorkspaceRouter'
 import { createNavigationController, type NavigationController, type RouteDescriptor } from './navigation'
 import { getRouteSubtitle, getRouteTitle } from './features/tools/toolNavigation'
+import { CommandPalette } from './features/command-palette/CommandPalette'
 
 const App: React.FC = () => {
   const settings = useSettingsStore()
   const ui = useUIStore()
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const navigation = useMemo<NavigationController | null>(() => {
     if (typeof window === 'undefined') return null
 
@@ -59,9 +61,37 @@ const App: React.FC = () => {
     }
   }, [ui.theme])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'k') return
+
+      event.preventDefault()
+      setIsCommandPaletteOpen(true)
+    }
+
+    window.addEventListener('keydown', handleShortcut)
+    return () => window.removeEventListener('keydown', handleShortcut)
+  }, [])
+
   const navigateRoute = useCallback((route: RouteDescriptor) => {
+    if (route.view === 'tool') {
+      ui.recordRecentTool(route.tool)
+    }
+
+    setIsCommandPaletteOpen(false)
     navigation?.navigate(route)
-  }, [navigation])
+  }, [navigation, ui])
+
+  const openCommandPalette = useCallback(() => {
+    setIsCommandPaletteOpen(true)
+  }, [])
+
+  const closeCommandPalette = useCallback(() => {
+    setIsCommandPaletteOpen(false)
+  }, [])
 
   const routeTitle = getRouteTitle(ui.route)
   const routeSubtitle = getRouteSubtitle(ui.route)
@@ -85,6 +115,8 @@ const App: React.FC = () => {
           privacyMode={settings.privacyMode}
           sidebarOpen={ui.sidebarOpen}
           onToggleSidebar={ui.toggleSidebar}
+          isCommandPaletteOpen={isCommandPaletteOpen}
+          onOpenCommandPalette={openCommandPalette}
           theme={ui.theme}
           onToggleTheme={ui.toggleTheme}
         />
@@ -98,6 +130,12 @@ const App: React.FC = () => {
           />
         </main>
       </div>
+
+      <CommandPalette
+        open={isCommandPaletteOpen}
+        onClose={closeCommandPalette}
+        onNavigate={navigateRoute}
+      />
     </div>
   )
 }

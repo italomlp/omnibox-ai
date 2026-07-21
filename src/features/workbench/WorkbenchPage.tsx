@@ -1,9 +1,11 @@
-import React from 'react'
-import { ArrowRight, Layers3, LibraryBig, Settings2, Sparkles } from 'lucide-react'
+import React, { useMemo } from 'react'
+import { ArrowRight, Layers3, LibraryBig, Pin, PinOff, Settings2, Sparkles } from 'lucide-react'
 import type { RouteDescriptor } from '../../navigation'
 import { TOOL_CATEGORIES } from '../../tools/categories'
-import { TOOL_REGISTRY } from '../../tools/registry'
+import { TOOL_REGISTRY, TOOL_REGISTRY_BY_ID } from '../../tools/registry'
 import { getToolCategory } from '../../tools/getTool'
+import { useUIStore } from '../../store/useUIStore'
+import type { ToolId } from '../../tools/types'
 import { buildToolRoute } from '../tools/toolNavigation'
 
 interface WorkbenchPageProps {
@@ -14,7 +16,77 @@ interface WorkbenchPageProps {
 
 const quickStartTools = TOOL_REGISTRY.filter((tool) => tool.id === 'grammar-tone' || tool.id === 'career')
 
+const resolveTool = (toolId: ToolId) => TOOL_REGISTRY_BY_ID[toolId]
+const isDefined = <T,>(value: T | undefined): value is T => value !== undefined
+
+const ToolCard: React.FC<{
+  toolId: ToolId
+  pinned: boolean
+  onOpen: () => void
+  onTogglePin: () => void
+}> = ({ toolId, pinned, onOpen, onTogglePin }) => {
+  const tool = resolveTool(toolId)
+
+  if (!tool) return null
+
+  const category = getToolCategory(tool.categoryId)
+
+  return (
+    <article className="rounded-2xl border border-zinc-800/70 bg-zinc-950/70 p-4 transition hover:border-zinc-700/70 hover:bg-zinc-900/60">
+      <div className="flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        >
+          <h3 className="truncate text-sm font-semibold text-zinc-50">{tool.title}</h3>
+          <p className="mt-1 line-clamp-2 text-sm leading-6 text-zinc-400">{tool.description}</p>
+        </button>
+
+        <button
+          type="button"
+          onClick={onTogglePin}
+          className="theme-icon-button rounded-lg border border-zinc-800 bg-zinc-900 p-2 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200"
+          aria-label={pinned ? `Unpin ${tool.title}` : `Pin ${tool.title}`}
+          title={pinned ? `Unpin ${tool.title}` : `Pin ${tool.title}`}
+        >
+          {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+        </button>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <div className="inline-flex rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+          {category.title}
+        </div>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800"
+        >
+          Open <ArrowRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </article>
+  )
+}
+
 export const WorkbenchPage: React.FC<WorkbenchPageProps> = ({ onNavigate, privacyMode, webGpuSupported }) => {
+  const pinnedToolIds = useUIStore((state) => state.pinnedToolIds)
+  const recentToolIds = useUIStore((state) => state.recentToolIds)
+  const togglePinnedTool = useUIStore((state) => state.togglePinnedTool)
+
+  const pinnedTools = useMemo(
+    () => pinnedToolIds.map((toolId) => TOOL_REGISTRY_BY_ID[toolId as ToolId]).filter(isDefined),
+    [pinnedToolIds],
+  )
+  const recentTools = useMemo(
+    () => recentToolIds
+      .filter((toolId) => !pinnedToolIds.includes(toolId))
+      .map((toolId) => TOOL_REGISTRY_BY_ID[toolId as ToolId])
+      .filter(isDefined),
+    [pinnedToolIds, recentToolIds],
+  )
+
   const readinessItems = [
     {
       label: 'Privacy',
@@ -84,61 +156,85 @@ export const WorkbenchPage: React.FC<WorkbenchPageProps> = ({ onNavigate, privac
       </header>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        {quickStartTools.map((tool) => (
-          <button
-            key={tool.id}
-            type="button"
-            onClick={() => onNavigate(buildToolRoute(tool.id))}
-            className="group rounded-2xl border border-zinc-800/70 bg-zinc-950/70 p-5 text-left transition hover:border-indigo-700/60 hover:bg-zinc-900/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-            aria-label={`Open ${tool.title}`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-2">
-                <h3 className="text-lg font-semibold text-zinc-50">{tool.title}</h3>
-                <p className="text-sm leading-6 text-zinc-400">{tool.description}</p>
-              </div>
-              <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-zinc-500 transition group-hover:text-zinc-200" />
-            </div>
-            <div className="mt-4 inline-flex rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-              {getToolCategory(tool.categoryId).title}
-            </div>
-          </button>
-        ))}
-      </div>
+        <div className="space-y-4">
+          {quickStartTools.map((tool) => (
+            <ToolCard
+              key={tool.id}
+              toolId={tool.id}
+              pinned={pinnedToolIds.includes(tool.id)}
+              onOpen={() => onNavigate(buildToolRoute(tool.id))}
+              onTogglePin={() => togglePinnedTool(tool.id)}
+            />
+          ))}
+        </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {[
-          {
-            title: 'Pinned tools',
-            body: 'Pinned shortcuts will appear here once favorites are enabled.',
-            action: 'Browse catalog',
-            route: { view: 'tools' } as RouteDescriptor,
-          },
-          {
-            title: 'Recent tools',
-            body: 'Recently used tools will populate this panel in a later phase.',
-            action: 'Open workbench',
-            route: { view: 'workbench' } as RouteDescriptor,
-          },
-          {
-            title: 'Recent runs',
-            body: 'Run history will surface here once execution records are wired in.',
-            action: 'Open library',
-            route: { view: 'library' } as RouteDescriptor,
-          },
-        ].map((card) => (
-          <div key={card.title} className="rounded-2xl border border-zinc-800/70 bg-zinc-950/70 p-5">
-            <h3 className="text-sm font-semibold text-zinc-100">{card.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">{card.body}</p>
+        <div className="space-y-4 rounded-2xl border border-zinc-800/70 bg-zinc-950/60 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-100">Pinned tools</h3>
+              <p className="mt-1 text-sm leading-6 text-zinc-400">Keep preferred tools one click away.</p>
+            </div>
             <button
               type="button"
-              onClick={() => onNavigate(card.route)}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800"
+              onClick={() => onNavigate({ view: 'tools' })}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800"
             >
-              {card.action}
+              Browse catalog
             </button>
           </div>
-        ))}
+
+          <div className="space-y-3">
+            {pinnedTools.length > 0 ? (
+              pinnedTools.map((tool) => (
+                <ToolCard
+                  key={tool.id}
+                  toolId={tool.id}
+                  pinned
+                  onOpen={() => onNavigate(buildToolRoute(tool.id))}
+                  onTogglePin={() => togglePinnedTool(tool.id)}
+                />
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-zinc-800/80 bg-zinc-950/40 p-5 text-sm leading-6 text-zinc-400">
+                Pin a tool from the workbench or command palette to save it here.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-800/70 bg-zinc-950/60 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-100">Recent tools</h3>
+            <p className="mt-1 text-sm leading-6 text-zinc-400">Recently opened tools stay cached for fast relaunch.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate({ view: 'tools' })}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800"
+          >
+            Open catalog
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+          {recentTools.length > 0 ? (
+            recentTools.map((tool) => (
+              <ToolCard
+                key={tool.id}
+                toolId={tool.id}
+                pinned={false}
+                onOpen={() => onNavigate(buildToolRoute(tool.id))}
+                onTogglePin={() => togglePinnedTool(tool.id)}
+              />
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-zinc-800/80 bg-zinc-950/40 p-5 text-sm leading-6 text-zinc-400 xl:col-span-2">
+              Open a tool from the catalog, sidebar, or command palette to populate this list.
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">

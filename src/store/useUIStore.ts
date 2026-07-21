@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { isToolId } from '../navigation'
 import {
   WORKBENCH_ROUTE,
   isRouteDescriptor,
@@ -9,6 +10,8 @@ import {
 } from '../navigation'
 
 const UI_STORAGE_KEY = 'omnibox-ui-v1'
+const UI_STORAGE_VERSION = 3
+const RECENT_TOOL_LIMIT = 8
 
 type Theme = 'dark' | 'light'
 
@@ -21,10 +24,27 @@ interface PersistedUIState {
   route: RouteDescriptor
   sidebarOpen: boolean
   theme: Theme
+  pinnedToolIds: string[]
+  recentToolIds: string[]
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const normalizeToolIdList = (value: unknown, limit?: number): string[] => {
+  if (!Array.isArray(value)) return []
+
+  const ids: string[] = []
+
+  for (const candidate of value) {
+    if (!isToolId(candidate) || ids.includes(candidate)) continue
+    ids.push(candidate)
+
+    if (typeof limit === 'number' && ids.length >= limit) break
+  }
+
+  return ids
+}
 
 const normalizePersistedUIState = (value: unknown): PersistedUIState => {
   const state = isRecord(value) ? value : {}
@@ -36,6 +56,8 @@ const normalizePersistedUIState = (value: unknown): PersistedUIState => {
     route,
     sidebarOpen: typeof state.sidebarOpen === 'boolean' ? state.sidebarOpen : true,
     theme: state.theme === 'light' ? 'light' : 'dark',
+    pinnedToolIds: normalizeToolIdList(state.pinnedToolIds),
+    recentToolIds: normalizeToolIdList(state.recentToolIds, RECENT_TOOL_LIMIT),
   }
 }
 
@@ -70,9 +92,18 @@ export interface UIState {
   sidebarOpen: boolean
   route: RouteDescriptor
   theme: Theme
+  pinnedToolIds: string[]
+  recentToolIds: string[]
   toggleSidebar: () => void
   setRoute: (route: RouteDescriptor) => void
   toggleTheme: () => void
+  togglePinnedTool: (toolId: string) => void
+  recordRecentTool: (toolId: string) => void
+}
+
+const pushUniqueToolId = (toolIds: string[], toolId: string, limit: number): string[] => {
+  const next = [toolId, ...toolIds.filter((candidate) => candidate !== toolId)]
+  return next.slice(0, limit)
 }
 
 export const useUIStore = create<UIState>()(
@@ -83,15 +114,29 @@ export const useUIStore = create<UIState>()(
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setRoute: (route) => set({ route: isRouteDescriptor(route) ? route : WORKBENCH_ROUTE }),
       toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+      togglePinnedTool: (toolId) => set((state) => {
+        if (!isToolId(toolId)) return {}
+
+        return state.pinnedToolIds.includes(toolId)
+          ? { pinnedToolIds: state.pinnedToolIds.filter((candidate) => candidate !== toolId) }
+          : { pinnedToolIds: [toolId, ...state.pinnedToolIds] }
+      }),
+      recordRecentTool: (toolId) => set((state) => {
+        if (!isToolId(toolId)) return {}
+
+        return { recentToolIds: pushUniqueToolId(state.recentToolIds, toolId, RECENT_TOOL_LIMIT) }
+      }),
     }),
     {
       name: UI_STORAGE_KEY,
-      version: 2,
+      version: UI_STORAGE_VERSION,
       migrate: (persistedState) => normalizePersistedUIState(persistedState),
       partialize: (state) => ({
         route: state.route,
         sidebarOpen: state.sidebarOpen,
         theme: state.theme,
+        pinnedToolIds: state.pinnedToolIds,
+        recentToolIds: state.recentToolIds,
       }),
       merge: (persistedState, currentState) => {
         const storedState = normalizePersistedUIState(persistedState)

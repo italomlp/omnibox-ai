@@ -1,66 +1,73 @@
 import React from 'react'
-import { Globe, Menu, Shield, Sun, Moon } from 'lucide-react'
-import { useUIStore } from '../../store/useUIStore'
+import { Command, Menu, MoonStar, Shield, SunMedium } from 'lucide-react'
 
 interface AppHeaderProps {
-  workspaceName: string;
-  privacyMode: boolean;
-  sidebarOpen: boolean;
-  onToggleSidebar: () => void;
+  title: string
+  subtitle?: string
+  privacyMode: boolean
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
-  workspaceName,
+  title,
+  subtitle,
   privacyMode,
   sidebarOpen,
   onToggleSidebar,
+  theme,
+  onToggleTheme,
 }) => {
-  const ui = useUIStore()
-
   return (
-    <header className="app-header flex h-16 items-center justify-between border-b border-zinc-900/60 px-4 md:px-6 backdrop-blur-md bg-zinc-950/45 sticky top-0 z-10">
+    <header className="app-header sticky top-0 z-10 flex h-16 items-center justify-between border-b border-zinc-900/60 bg-zinc-950/45 px-4 backdrop-blur-md md:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        {/* Menu icon if sidebar collapses */}
         {!sidebarOpen && (
           <button
+            type="button"
             onClick={onToggleSidebar}
-            className="theme-icon-button p-1 rounded-md hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-all mr-1 md:hidden"
+            className="theme-icon-button mr-1 rounded-md p-1 text-zinc-400 transition-all hover:bg-zinc-900/60 hover:text-zinc-200 md:hidden"
             aria-label="Open sidebar"
           >
-            <Menu className="w-4.5 h-4.5" />
+            <Menu className="h-4.5 w-4.5" />
           </button>
         )}
 
-        <h1 className="min-w-0 truncate text-sm font-bold tracking-wider text-zinc-200 uppercase">
-          {workspaceName}
-        </h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-semibold tracking-wide text-zinc-100">{title}</h1>
+          {subtitle ? <p className="truncate text-[11px] text-zinc-500">{subtitle}</p> : null}
+        </div>
       </div>
 
-      {/* Global Indicators Bar */}
-      <div className="flex items-center gap-3 md:gap-4 text-xs">
-        {/* Light/Dark Mode Switcher */}
+      <div className="flex items-center gap-2 md:gap-3 text-xs">
         <button
-          onClick={ui.toggleTheme}
-          className="theme-icon-button p-2 rounded-lg hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-colors"
-          title={`Switch to ${ui.theme === 'dark' ? 'light' : 'dark'} mode`}
-          aria-label={`Switch to ${ui.theme === 'dark' ? 'light' : 'dark'} mode`}
+          type="button"
+          onClick={onToggleTheme}
+          className="theme-icon-button rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-900/60 hover:text-zinc-200"
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         >
-          {ui.theme === 'dark' ? (
-            <Sun className="w-4 h-4 text-amber-400" />
+          {theme === 'dark' ? (
+            <SunMedium className="h-4 w-4 text-amber-400" />
           ) : (
-            <Moon className="w-4 h-4 text-indigo-600" />
+            <MoonStar className="h-4 w-4 text-indigo-400" />
           )}
         </button>
 
-        {privacyMode ? (
-          <div className="status-pill status-pill-success flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/20 border border-emerald-800/30 text-emerald-300 font-semibold tracking-wide text-[10px] uppercase shadow-[0_0_10px_rgba(16,185,129,0.06)]">
-            <Shield className="w-3 h-3 text-emerald-400" /> Local-Only
-          </div>
-        ) : (
-          <div className="status-pill status-pill-neutral flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 tracking-wide text-[10px] uppercase">
-            <Globe className="w-3 h-3 text-zinc-500" /> Cloud Enabled
-          </div>
-        )}
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800"
+          aria-label="Command palette coming soon"
+        >
+          <Command className="h-3.5 w-3.5 text-zinc-500" />
+          Coming soon
+        </button>
+
+        <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${privacyMode ? 'border-emerald-900/40 bg-emerald-950/20 text-emerald-300' : 'border-zinc-800 bg-zinc-900 text-zinc-300'}`}>
+          <Shield className={`h-3 w-3 ${privacyMode ? 'text-emerald-400' : 'text-zinc-500'}`} />
+          {privacyMode ? 'Local-only' : 'Cloud enabled'}
+        </div>
       </div>
     </header>
   )

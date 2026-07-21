@@ -1,17 +1,45 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-export const WORKSPACE_IDS = ['grammar', 'career', 'history', 'settings'] as const
-
-export type WorkspaceId = (typeof WORKSPACE_IDS)[number]
-
-export const isWorkspaceId = (value: unknown): value is WorkspaceId =>
-  typeof value === 'string' && WORKSPACE_IDS.includes(value as WorkspaceId)
+import {
+  WORKBENCH_ROUTE,
+  isRouteDescriptor,
+  resolveRoute,
+  routeForLegacyWorkspace,
+  type RouteDescriptor,
+} from '../navigation'
 
 const UI_STORAGE_KEY = 'omnibox-ui-v1'
-const DEFAULT_WORKSPACE: WorkspaceId = 'grammar'
 
-const readStoredWorkspace = (): WorkspaceId | null => {
+type Theme = 'dark' | 'light'
+
+export type WorkspaceId = 'grammar' | 'career' | 'history' | 'settings'
+
+export const isWorkspaceId = (value: unknown): value is WorkspaceId =>
+  value === 'grammar' || value === 'career' || value === 'history' || value === 'settings'
+
+interface PersistedUIState {
+  route: RouteDescriptor
+  sidebarOpen: boolean
+  theme: Theme
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const normalizePersistedUIState = (value: unknown): PersistedUIState => {
+  const state = isRecord(value) ? value : {}
+  const route = isRouteDescriptor(state.route)
+    ? state.route
+    : routeForLegacyWorkspace(state.activeWorkspace) ?? WORKBENCH_ROUTE
+
+  return {
+    route,
+    sidebarOpen: typeof state.sidebarOpen === 'boolean' ? state.sidebarOpen : true,
+    theme: state.theme === 'light' ? 'light' : 'dark',
+  }
+}
+
+const readStoredUIState = (): PersistedUIState | null => {
   if (typeof window === 'undefined') return null
 
   try {
@@ -19,67 +47,60 @@ const readStoredWorkspace = (): WorkspaceId | null => {
     if (!rawValue) return null
 
     const parsed: unknown = JSON.parse(rawValue)
-    if (isWorkspaceId(parsed)) return parsed
-
-    const state = parsed && typeof parsed === 'object' && parsed !== null && 'state' in parsed
-      ? (parsed as { state?: unknown }).state
-      : parsed
-
-    if (!state || typeof state !== 'object' || Array.isArray(state)) return null
-
-    const activeWorkspace = (state as { activeWorkspace?: unknown }).activeWorkspace ?? (parsed as { activeWorkspace?: unknown }).activeWorkspace
-    return isWorkspaceId(activeWorkspace) ? activeWorkspace : null
+    const state = isRecord(parsed) && 'state' in parsed ? parsed.state : parsed
+    return normalizePersistedUIState(state)
   } catch {
     return null
   }
 }
 
-const readWorkspaceFromLocation = (): WorkspaceId | null => {
+const readRouteFromLocation = (): RouteDescriptor | null => {
   if (typeof window === 'undefined') return null
 
-  const workspace = new URL(window.location.href).searchParams.get('workspace')
-  return isWorkspaceId(workspace) ? workspace : null
+  const resolution = resolveRoute(new URL(window.location.href))
+  return resolution.source === 'none' ? null : resolution.route
 }
 
-const resolveInitialWorkspace = (): WorkspaceId =>
-  readWorkspaceFromLocation() ?? readStoredWorkspace() ?? DEFAULT_WORKSPACE
+const resolveInitialUIState = (): PersistedUIState => {
+  const persistedState = readStoredUIState() ?? normalizePersistedUIState(undefined)
+  return { ...persistedState, route: readRouteFromLocation() ?? persistedState.route }
+}
 
 export interface UIState {
-  sidebarOpen: boolean;
-  activeWorkspace: WorkspaceId;
-  theme: 'dark' | 'light';
-  toggleSidebar: () => void;
-  setActiveWorkspace: (workspace: WorkspaceId) => void;
-  toggleTheme: () => void;
+  sidebarOpen: boolean
+  route: RouteDescriptor
+  theme: Theme
+  toggleSidebar: () => void
+  setRoute: (route: RouteDescriptor) => void
+  toggleTheme: () => void
 }
 
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
-      sidebarOpen: true,
-      activeWorkspace: resolveInitialWorkspace(),
-      theme: 'dark',
+      ...resolveInitialUIState(),
 
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-      setActiveWorkspace: (workspace) => set({ activeWorkspace: workspace }),
+      setRoute: (route) => set({ route: isRouteDescriptor(route) ? route : WORKBENCH_ROUTE }),
       toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
     }),
     {
-      name: 'omnibox-ui-v1',
+      name: UI_STORAGE_KEY,
+      version: 2,
+      migrate: (persistedState) => normalizePersistedUIState(persistedState),
+      partialize: (state) => ({
+        route: state.route,
+        sidebarOpen: state.sidebarOpen,
+        theme: state.theme,
+      }),
       merge: (persistedState, currentState) => {
-        const persistedWorkspace =
-          persistedState && typeof persistedState === 'object' && 'activeWorkspace' in persistedState
-            ? (persistedState as { activeWorkspace?: unknown }).activeWorkspace
-            : undefined
+        const storedState = normalizePersistedUIState(persistedState)
+        const locationRoute = readRouteFromLocation()
 
         return {
           ...currentState,
-          ...(persistedState as Partial<UIState>),
-          activeWorkspace: isWorkspaceId(currentState.activeWorkspace)
-            ? currentState.activeWorkspace
-            : isWorkspaceId(persistedWorkspace)
-              ? persistedWorkspace
-              : DEFAULT_WORKSPACE,
+          ...storedState,
+          route: locationRoute ?? storedState.route,
         }
       },
     }

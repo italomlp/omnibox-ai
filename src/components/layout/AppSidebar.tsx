@@ -1,22 +1,15 @@
-import React, { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Cpu, Shield } from 'lucide-react'
-import type { WorkspaceId } from '../../store/useUIStore'
-
-interface WorkspaceItem {
-  id: WorkspaceId;
-  name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  desc: string;
-}
+import React, { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Cpu, Layers3, LibraryBig, Settings2, Shield, Sparkles, SquareStack } from 'lucide-react'
+import type { RouteDescriptor } from '../../navigation'
+import { getToolCategory, getTool } from '../../tools/getTool'
 
 interface AppSidebarProps {
-  workspaces: WorkspaceItem[];
-  activeWorkspace: WorkspaceId;
-  sidebarOpen: boolean;
-  onToggleSidebar: () => void;
-  onSelectWorkspace: (id: WorkspaceId) => void;
-  webGpuSupported: boolean | null;
-  privacyMode: boolean;
+  route: RouteDescriptor
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
+  onNavigate: (route: RouteDescriptor) => void
+  webGpuSupported: boolean | null
+  privacyMode: boolean
 }
 
 const useIsMobileViewport = () => {
@@ -36,16 +29,24 @@ const useIsMobileViewport = () => {
 }
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({
-  workspaces,
-  activeWorkspace,
+  route,
   sidebarOpen,
   onToggleSidebar,
-  onSelectWorkspace,
+  onNavigate,
   webGpuSupported,
   privacyMode,
 }) => {
   const isMobile = useIsMobileViewport()
   const expandedContentClass = sidebarOpen ? 'block' : 'block md:hidden'
+  const activePrimaryView = route.view === 'tool' ? 'tools' : route.view
+
+  const activeTool = useMemo(() => (route.view === 'tool' ? getTool(route.tool) : null), [route])
+  const primaryNavigation = [
+    { view: 'workbench' as const, label: 'Workbench', description: 'Landing area', icon: SquareStack },
+    { view: 'tools' as const, label: 'Tools', description: 'Catalog', icon: Layers3 },
+    { view: 'library' as const, label: 'Library', description: 'Runs and documents', icon: LibraryBig },
+    { view: 'system' as const, label: 'System', description: 'Privacy and providers', icon: Settings2 },
+  ]
 
   return (
     <>
@@ -67,7 +68,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       >
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-zinc-900/60 flex-shrink-0">
-          <div className={`flex items-center gap-2.5 overflow-hidden ${!sidebarOpen && 'justify-center w-full'}`}>
+          <div className={`flex items-center gap-2.5 overflow-hidden ${!sidebarOpen ? 'justify-center w-full' : ''}`}>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30 flex-shrink-0">
               Ω
             </div>
@@ -77,6 +78,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           </div>
           <div className={expandedContentClass}>
             <button
+              type="button"
               onClick={onToggleSidebar}
               className="theme-icon-button p-1 rounded-md hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-colors"
               aria-label="Close sidebar"
@@ -86,17 +88,17 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           </div>
         </div>
 
-        {/* Workspace Selectors */}
+        {/* Primary Navigation */}
         <nav className="flex-1 space-y-1.5 px-3 py-4 overflow-y-auto">
-          {workspaces.map((w) => {
-            const Icon = w.icon
-            const isActive = activeWorkspace === w.id
+          {primaryNavigation.map((item) => {
+            const Icon = item.icon
+            const isActive = activePrimaryView === item.view
             return (
               <button
-                key={w.id}
+                key={item.view}
+                type="button"
                 onClick={() => {
-                  onSelectWorkspace(w.id)
-                  // Auto-close sidebar on mobile after choosing a workspace
+                  onNavigate({ view: item.view })
                   if (isMobile) {
                     onToggleSidebar()
                   }
@@ -106,23 +108,64 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     ? 'app-nav-item-active bg-zinc-900/70 text-indigo-400 border border-zinc-800/80 shadow-[0_0_12px_rgba(99,102,241,0.08)]'
                     : 'text-zinc-400 hover:bg-zinc-900/30 hover:text-zinc-200 border border-transparent'
                 }`}
-                title={!sidebarOpen ? w.name : ''}
+                title={!sidebarOpen ? item.label : ''}
+                aria-current={isActive ? 'page' : undefined}
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-zinc-200'}`} />
                 <div className={`${expandedContentClass} flex-1 min-w-0`}>
-                  <p className="text-xs font-semibold tracking-wide truncate">{w.name}</p>
-                  <p className="text-[9px] text-zinc-500 truncate mt-0.5 leading-none">{w.desc}</p>
+                  <p className="text-xs font-semibold tracking-wide truncate">{item.label}</p>
+                  <p className="text-[9px] text-zinc-500 truncate mt-0.5 leading-none">{item.description}</p>
                 </div>
               </button>
             )
           })}
         </nav>
 
+        <div className="border-t border-zinc-900/60 px-3 py-3">
+          <div className="rounded-2xl border border-zinc-800/60 bg-zinc-950/70 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Active tool</div>
+              {route.view === 'tool' ? (
+                <span className="rounded-full border border-emerald-900/40 bg-emerald-950/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                  Selected
+                </span>
+              ) : null}
+            </div>
+
+            {activeTool ? (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-indigo-400" />
+                  <div className={`min-w-0 ${expandedContentClass}`}>
+                    <div className="truncate text-sm font-medium text-zinc-100">{activeTool.title}</div>
+                    <div className="truncate text-[11px] text-zinc-500">{getToolCategory(activeTool.categoryId).title}</div>
+                  </div>
+                </div>
+                <p className={`${expandedContentClass} text-[11px] leading-5 text-zinc-500`}>{activeTool.description}</p>
+              </div>
+            ) : (
+              <div className={`mt-3 ${expandedContentClass} text-[11px] leading-5 text-zinc-500`}>
+                Choose a tool from the catalog to surface it here.
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onNavigate({ view: 'tools' })}
+              className={`mt-3 inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800 ${!sidebarOpen ? 'w-full justify-center' : ''}`}
+            >
+              <Layers3 className="h-3.5 w-3.5" />
+              <span className={expandedContentClass}>Browse tools</span>
+            </button>
+          </div>
+        </div>
+
         {/* Sidebar Footer Indicators */}
         <div className="p-3 border-t border-zinc-900/60 space-y-2 flex-shrink-0">
           {/* Collapse toggle when narrow */}
           {!sidebarOpen && (
             <button
+              type="button"
               onClick={onToggleSidebar}
               className="theme-icon-button w-full hidden md:flex h-8 items-center justify-center rounded-lg hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-all"
               aria-label="Expand sidebar"
@@ -132,7 +175,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           )}
 
           {/* WebGPU Status Indicator */}
-          <div className={`status-card flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-900/20 text-xs border border-zinc-900/40 ${!sidebarOpen && 'justify-center'}`}>
+          <div className={`status-card flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-900/20 text-xs border border-zinc-900/40 ${!sidebarOpen ? 'justify-center' : ''}`}>
             <Cpu className={`w-3.5 h-3.5 flex-shrink-0 ${
               webGpuSupported === null
                 ? 'text-zinc-500'
@@ -151,7 +194,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
 
           {/* Privacy Indicator */}
           {privacyMode && (
-            <div className={`status-card status-card-success flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-xs ${!sidebarOpen && 'justify-center'}`}>
+            <div className={`status-card status-card-success flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-xs ${!sidebarOpen ? 'justify-center' : ''}`}>
               <Shield className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
               <span className={`${expandedContentClass} text-[10px] text-emerald-300 font-semibold truncate leading-none`}>
                 Privacy Locked

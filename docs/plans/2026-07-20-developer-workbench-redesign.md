@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This is the durable implementation guide for evolving OmniBox AI from four fixed workspaces into a local-first developer workbench with an extensible tool catalog.
+In progress. Phases 0 through 7 are implemented on `feat/developer-workbench-redesign`; Phase 8 remains for dependency-sensitive parser, Electron-readiness, and formal test hardening.
 
 ## Purpose
 

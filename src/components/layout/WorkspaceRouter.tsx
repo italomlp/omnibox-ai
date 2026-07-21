@@ -1,6 +1,6 @@
 import React from 'react'
 import type { RouteDescriptor } from '../../navigation'
-import { HistoryWorkspace } from '../../features/history/HistoryWorkspace'
+import { LibraryPage } from '../../features/library/LibraryPage'
 import { SettingsPanel } from '../../features/settings/SettingsPanel'
 import { ToolRoutePage } from '../../features/tools/ToolRoutePage'
 import { ToolsCatalogPage } from '../../features/tools/ToolsCatalogPage'
@@ -22,11 +22,7 @@ export const WorkspaceRouter: React.FC<WorkspaceRouterProps> = ({ route, onNavig
     case 'tool':
       return <ToolRoutePage toolId={route.tool} onNavigate={onNavigate} />
     case 'library':
-      return (
-        <HistoryWorkspace
-          onNavigateWorkspace={(workspace) => onNavigate(workspace === 'career' ? { view: 'tool', tool: 'career' } : { view: 'tool', tool: 'grammar-tone' })}
-        />
-      )
+      return <LibraryPage section={route.section} onNavigate={onNavigate} />
     case 'system':
       return <SettingsPanel />
     default:

@@ -1,68 +1,30 @@
-declare global {
-  interface Window {
-    pdfjsLib?: unknown;
-    mammoth?: unknown;
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+type PdfJsModule = typeof import('pdfjs-dist')
+type MammothModule = typeof import('mammoth')
+type PdfTextItem = { str?: string }
+
+let pdfJsModulePromise: Promise<PdfJsModule> | null = null
+let mammothModulePromise: Promise<MammothModule> | null = null
+let pdfWorkerConfigured = false
+
+function isPdfTextItem(item: unknown): item is { str: string } {
+  return typeof item === 'object' && item !== null && 'str' in item && typeof (item as { str?: unknown }).str === 'string'
+}
+
+async function loadPdfJsModule(): Promise<PdfJsModule> {
+  const pdfjsLib = await (pdfJsModulePromise ??= import('pdfjs-dist'))
+
+  if (!pdfWorkerConfigured) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+    pdfWorkerConfigured = true
   }
+
+  return pdfjsLib
 }
 
-interface ParserOptions {
-  allowExternalLibraries?: boolean;
-}
-
-interface PdfJsLib {
-  GlobalWorkerOptions: {
-    workerSrc: string;
-  };
-  getDocument: (options: { data: ArrayBuffer }) => {
-    promise: Promise<{
-      numPages: number;
-      getPage: (pageNumber: number) => Promise<{
-        getTextContent: () => Promise<{
-          items: Array<{ str?: string }>;
-        }>;
-      }>;
-    }>;
-  };
-}
-
-interface MammothLib {
-  convertToMarkdown: (options: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>;
-}
-
-export class ParserPrivacyError extends Error {
-  constructor(fileType: 'PDF' | 'DOCX') {
-    super(
-      `Privacy Mode blocked ${fileType} parsing because it requires loading a third-party parser library from a CDN. Upload a TXT or Markdown file, or turn off Privacy Mode to parse ${fileType} files.`
-    )
-    this.name = 'ParserPrivacyError'
-  }
-}
-
-/**
- * Dynamically loads a script if it's not already present.
- */
-function loadScript(src: string, globalName: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window[globalName as keyof Window]) {
-      resolve()
-      return
-    }
-
-    // Check if script element already exists in document
-    const existing = document.querySelector(`script[src="${src}"]`)
-    if (existing) {
-      existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', (err) => reject(err))
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = src
-    script.async = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error(`Failed to load script: ${src}`))
-    document.head.appendChild(script)
-  })
+async function loadMammothModule(): Promise<MammothModule> {
+  return (mammothModulePromise ??= import('mammoth'))
 }
 
 /**
@@ -71,85 +33,49 @@ function loadScript(src: string, globalName: string): Promise<void> {
 export async function extractTextFromPdf(
   file: File,
   onProgress?: (msg: string) => void,
-  options: ParserOptions = {}
 ): Promise<string> {
-  if (options.allowExternalLibraries === false) {
-    throw new ParserPrivacyError('PDF')
-  }
-
   if (onProgress) onProgress('Loading PDF parser library...')
-  
-  // Load pdf.js from CDN
-  await loadScript(
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-    'pdfjsLib'
-  )
 
-  const pdfjsLib = window.pdfjsLib as PdfJsLib | undefined
-  if (!pdfjsLib) {
-    throw new Error('PDF.js library could not be loaded.')
-  }
+  const pdfjsLib = await loadPdfJsModule()
+  const fileBytes = new Uint8Array(await file.arrayBuffer())
 
-  // Set the worker source path
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-
-  if (onProgress) onProgress('Reading file contents...')
-  const arrayBuffer = await file.arrayBuffer()
-  
   if (onProgress) onProgress('Parsing PDF structures...')
-  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
-  const pdf = await loadingTask.promise
-  
-  let fullText = ''
-  const numPages = pdf.numPages
+  const loadingTask = pdfjsLib.getDocument({ data: fileBytes })
 
-  for (let i = 1; i <= numPages; i++) {
-    if (onProgress) onProgress(`Extracting page ${i} of ${numPages}...`)
-    const page = await pdf.getPage(i)
-    const textContent = await page.getTextContent()
-    
-    // Joint string items with coordinate-spaced boundaries
-    const pageText = textContent.items
-      .map((item) => item.str || '')
-      .join(' ')
-    
-    fullText += pageText + '\n\n'
+  try {
+    const pdf = await loadingTask.promise
+    const pageTexts: string[] = []
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      if (onProgress) onProgress(`Extracting page ${pageNumber} of ${pdf.numPages}...`)
+      const page = await pdf.getPage(pageNumber)
+      const textContent = await page.getTextContent()
+      const pageText = (textContent.items as PdfTextItem[]).filter(isPdfTextItem).map((item) => item.str).join(' ')
+      pageTexts.push(pageText)
+    }
+
+    if (onProgress) onProgress('Parsing complete.')
+    return pageTexts.join('\n\n').trim()
+  } finally {
+    await loadingTask.destroy().catch(() => undefined)
   }
-
-  if (onProgress) onProgress('Parsing complete.')
-  return fullText.trim()
 }
 
 /**
- * Extracts Markdown from a Word .docx document using mammoth.js.
+ * Extracts plain text from a Word .docx document using mammoth.js.
  */
 export async function extractTextFromDocx(
   file: File,
   onProgress?: (msg: string) => void,
-  options: ParserOptions = {}
 ): Promise<string> {
-  if (options.allowExternalLibraries === false) {
-    throw new ParserPrivacyError('DOCX')
-  }
-
   if (onProgress) onProgress('Loading Word document parser library...')
-  
-  // Load mammoth.js from CDN
-  await loadScript(
-    'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js',
-    'mammoth'
-  )
-
-  const mammoth = window.mammoth as MammothLib | undefined
-  if (!mammoth) {
-    throw new Error('Mammoth.js library could not be loaded.')
-  }
 
   if (onProgress) onProgress('Reading file contents...')
   const arrayBuffer = await file.arrayBuffer()
+  const mammoth = await loadMammothModule()
 
-  if (onProgress) onProgress('Converting Word structures to Markdown...')
-  const result = await mammoth.convertToMarkdown({ arrayBuffer })
+  if (onProgress) onProgress('Converting Word structures to text...')
+  const result = await mammoth.extractRawText({ arrayBuffer })
   
   if (onProgress) onProgress('Parsing complete.')
   return result.value.trim()

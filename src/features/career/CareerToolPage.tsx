@@ -10,7 +10,6 @@ import { useInference } from '../../hooks/useInference'
 import { WEBLLM_MODEL_CONFIG_BY_ID } from '../../config/providers'
 import { extractTextFromDocx, extractTextFromPdf } from '../../utils/pdfParser'
 import { getTaskContextBudget } from '../../services/inference'
-import { useSettingsStore } from '../../store/useSettingsStore'
 import { CareerActionPanel } from './CareerActionPanel'
 import { CareerContextPanel } from './CareerContextPanel'
 import { CareerPastResults } from './CareerPastResults'
@@ -34,7 +33,6 @@ const emptyValidationState: CareerValidationState = {}
 
 export const CareerToolPage: React.FC = () => {
   const inference = useInference()
-  const privacyMode = useSettingsStore((state) => state.privacyMode)
   const {
     activeProvider,
     setActiveProvider,
@@ -129,9 +127,9 @@ export const CareerToolPage: React.FC = () => {
       let parsedText = ''
 
       if (extension === 'pdf') {
-        parsedText = await extractTextFromPdf(file, setParsingStatus, { allowExternalLibraries: !privacyMode })
+        parsedText = await extractTextFromPdf(file, setParsingStatus)
       } else if (extension === 'docx') {
-        parsedText = await extractTextFromDocx(file, setParsingStatus, { allowExternalLibraries: !privacyMode })
+        parsedText = await extractTextFromDocx(file, setParsingStatus)
       } else if (extension === 'txt' || extension === 'md') {
         setParsingStatus('Reading text file...')
         parsedText = await file.text()

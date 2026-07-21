@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress. Phases 0 through 7 are implemented on `feat/developer-workbench-redesign`; Phase 8 remains for dependency-sensitive parser, Electron-readiness, and formal test hardening.
+Implemented on `feat/developer-workbench-redesign`. Phases 0 through 8 are complete; future Electron packaging remains intentionally out of scope until a desktop target is selected.
 
 ## Purpose
 

@@ -45,6 +45,9 @@ export interface LegacyRunInferenceOptions {
   maxTokens?: number
   stopSequences?: string | string[]
   thinking?: boolean
+  toolId?: string
+  toolVersion?: number
+  actionId?: string
   onChunk: (chunk: string) => void
   onComplete: (fullText: string) => void
 }
@@ -56,6 +59,9 @@ export interface StructuredRunInferenceOptions<TTask extends InferenceTaskId = I
   maxTokens?: number
   stopSequences?: string | string[]
   thinking?: boolean
+  toolId?: string
+  toolVersion?: number
+  actionId?: string
   onChunk?: (chunk: string) => void
   onComplete: (fullText: string) => void
 }
@@ -720,9 +726,9 @@ export function useInference(): UseInferenceReturn {
     }
 
     const runTracker = await createRunRecord({
-      toolId: isStructuredRunInferenceOptions(opts) ? opts.task : LEGACY_RUN_TOOL_ID,
-      toolVersion: 1,
-      actionId: isStructuredRunInferenceOptions(opts) ? opts.task : undefined,
+      toolId: opts.toolId ?? (isStructuredRunInferenceOptions(opts) ? opts.task : LEGACY_RUN_TOOL_ID),
+      toolVersion: opts.toolVersion ?? 1,
+      actionId: opts.actionId ?? (isStructuredRunInferenceOptions(opts) ? opts.task : undefined),
       input: makeRunInputSnapshot(
         isStructuredRunInferenceOptions(opts)
           ? buildStructuredRunInputSnapshot(

@@ -36,6 +36,35 @@ export const runsRepository = {
 export const documentRecordsRepository = {
   list: async (): Promise<DocumentRecord[]> => sortNewestFirst(await db.documentRecords.toArray()),
   get: async (id: number): Promise<DocumentRecord | undefined> => db.documentRecords.get(id),
+  getByName: async (name: string): Promise<DocumentRecord | undefined> => {
+    const matches = await db.documentRecords.toArray()
+    return sortNewestFirst(matches.filter((record) => record.name === name))[0]
+  },
+  upsertByName: async (record: Omit<DocumentRecord, 'id' | 'schemaVersion' | 'legacy'>): Promise<void> => {
+    const matches = await db.documentRecords.toArray()
+    const existing = sortNewestFirst(matches.filter((item) => item.name === record.name))[0]
+
+    if (existing?.id) {
+      await db.documentRecords.update(existing.id, {
+        ...record,
+        schemaVersion: existing.schemaVersion,
+        legacy: existing.legacy,
+        createdAt: existing.createdAt,
+        updatedAt: record.updatedAt,
+      })
+      return
+    }
+
+    await db.documentRecords.add({
+      ...record,
+      schemaVersion: 2,
+    })
+  },
+  deleteByName: async (name: string): Promise<void> => {
+    const matches = await db.documentRecords.toArray()
+    const records = matches.filter((record) => record.name === name && typeof record.id === 'number')
+    await Promise.all(records.map((record) => db.documentRecords.delete(record.id!)))
+  },
   delete: async (id: number): Promise<void> => { await db.documentRecords.delete(id) },
   clear: async (): Promise<void> => { await db.documentRecords.clear() },
 }

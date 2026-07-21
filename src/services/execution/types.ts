@@ -26,6 +26,10 @@ export interface ExecutionRequestCallbacks<TOutput = unknown> {
   onCancel?: () => void
 }
 
+export interface ExecutionPolicyContext {
+  privacyMode: boolean
+}
+
 export interface ExecutionStructuredTask<TKind extends string = string, TPayload = unknown> {
   kind: TKind
   payload: TPayload

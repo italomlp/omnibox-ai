@@ -21,6 +21,7 @@ import type { LLMRequest, StreamCallbacks, ProviderId } from './types'
 import { buildProviderRequest } from './buildProviderRequest'
 import { getChunkParser } from './parsers'
 import { executeSSEStream } from './executeSSEStream'
+import { evaluateExecutionPolicy, type ExecutionPolicyContext } from '../execution'
 
 interface StreamConfig {
   apiKey: string
@@ -40,8 +41,14 @@ export async function streamLLM(
   config: StreamConfig,
   request: LLMRequest,
   callbacks: StreamCallbacks,
+  policyContext: ExecutionPolicyContext,
   signal?: AbortSignal,
 ): Promise<void> {
+  const policyDecision = evaluateExecutionPolicy(policyContext.privacyMode, provider)
+  if (!policyDecision.allowed) {
+    throw new Error(policyDecision.reason)
+  }
+
   const requestConfig = buildProviderRequest(provider, config, request)
   const parser = getChunkParser(provider)
   return executeSSEStream(requestConfig, parser, callbacks, provider, signal)

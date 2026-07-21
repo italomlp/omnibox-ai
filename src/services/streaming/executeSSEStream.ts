@@ -1,6 +1,19 @@
 import type { ProviderRequestConfig, StreamCallbacks, ProviderId } from './types'
 import { OllamaCORSException, AnthropicCORSException } from './errors'
 
+const makeAbortError = (message = 'The request was aborted.') => {
+  const error = new Error(message)
+  error.name = 'AbortError'
+  return error
+}
+
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === 'AbortError'
+
+const isAbortSignalTriggered = (signal?: AbortSignal): boolean => Boolean(signal?.aborted)
+
+const normalizeError = (error: unknown): Error => (error instanceof Error ? error : new Error(String(error)))
+
 /**
  * Execute a Server-Sent Events stream against a provider endpoint.
  *
@@ -15,10 +28,18 @@ export async function executeSSEStream(
   provider: ProviderId,
   signal?: AbortSignal,
 ): Promise<void> {
+  let aborted = isAbortSignalTriggered(signal)
+  const abortHandler = () => {
+    aborted = true
+  }
+
+  signal?.addEventListener('abort', abortHandler)
+
   try {
-    // -----------------------------------------------------------------------
-    // 1. Fetch with optional AbortSignal
-    // -----------------------------------------------------------------------
+    if (aborted) {
+      throw makeAbortError()
+    }
+
     let response: Response
     try {
       response = await fetch(config.url, {
@@ -28,13 +49,14 @@ export async function executeSSEStream(
         signal,
       })
     } catch (fetchError: unknown) {
-      // Network-level failures — likely CORS or server down
+      if (aborted || isAbortSignalTriggered(signal) || isAbortError(fetchError)) {
+        throw makeAbortError()
+      }
+
       if (provider === 'ollama') {
         throw new OllamaCORSException()
       }
       if (provider === 'anthropic') {
-        // Only raise the CORS hint when the request targeted the default
-        // Anthropic origin (a custom proxy is unlikely to have the same issue).
         const isDefaultOrigin =
           config.url.startsWith('https://api.anthropic.com')
         if (isDefaultOrigin) {
@@ -44,9 +66,10 @@ export async function executeSSEStream(
       throw fetchError
     }
 
-    // -----------------------------------------------------------------------
-    // 2. HTTP error handling
-    // -----------------------------------------------------------------------
+    if (aborted || isAbortSignalTriggered(signal)) {
+      throw makeAbortError()
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       throw new Error(`API error (${response.status}): ${errorText}`)
@@ -56,25 +79,33 @@ export async function executeSSEStream(
       throw new Error('Response body is not readable.')
     }
 
-    // -----------------------------------------------------------------------
-    // 3. Stream reading via ReadableStream + TextDecoder
-    // -----------------------------------------------------------------------
     const reader = response.body.getReader()
     const decoder = new TextDecoder('utf-8')
     let buffer = ''
     let fullText = ''
 
     while (true) {
+      if (aborted || isAbortSignalTriggered(signal)) {
+        throw makeAbortError()
+      }
+
       const { value, done } = await reader.read()
+      if (aborted || isAbortSignalTriggered(signal)) {
+        throw makeAbortError()
+      }
+
       if (done) break
 
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
 
-      // Keep the last (potentially incomplete) line in the buffer
       buffer = lines.pop() || ''
 
       for (const line of lines) {
+        if (aborted || isAbortSignalTriggered(signal)) {
+          throw makeAbortError()
+        }
+
         const content = processSSELine(line, parser)
         if (content) {
           fullText += content
@@ -83,9 +114,10 @@ export async function executeSSEStream(
       }
     }
 
-    // -----------------------------------------------------------------------
-    // 4. Flush remaining buffer
-    // -----------------------------------------------------------------------
+    if (aborted || isAbortSignalTriggered(signal)) {
+      throw makeAbortError()
+    }
+
     if (buffer.trim()) {
       const content = processSSELine(buffer, parser)
       if (content) {
@@ -94,12 +126,20 @@ export async function executeSSEStream(
       }
     }
 
-    // -----------------------------------------------------------------------
-    // 5. Signal completion
-    // -----------------------------------------------------------------------
+    if (aborted || isAbortSignalTriggered(signal)) {
+      throw makeAbortError()
+    }
+
     callbacks.onComplete(fullText)
   } catch (err: unknown) {
-    callbacks.onError(err instanceof Error ? err : new Error(String(err)))
+    const error = normalizeError(err)
+    if (!isAbortError(error)) {
+      callbacks.onError(error)
+    }
+
+    throw error
+  } finally {
+    signal?.removeEventListener('abort', abortHandler)
   }
 }
 

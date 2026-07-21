@@ -83,6 +83,7 @@ export interface RunRecord {
   }
   execution: RunExecution
   createdAt: number
+  updatedAt: number
   completedAt?: number
   legacy?: LegacyRunProvenance
 }
@@ -254,6 +255,7 @@ const normalizeLegacyRunRecord = (historyItem: HistoryItem): RunRecord => {
     output: stringifyDisplayValue(historyItem.output, '[Unable to display legacy output payload]'),
     execution,
     createdAt,
+    updatedAt: createdAt,
     completedAt: createdAt,
     legacy: {
       kind: 'legacy-run',

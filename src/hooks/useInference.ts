@@ -11,6 +11,13 @@ import {
 } from '../config/providers'
 import { streamLLM } from '../services/streaming'
 import {
+  createRunRecord,
+  evaluateExecutionPolicy,
+  getProviderLocality,
+  type RunRecordHandle,
+} from '../services/execution'
+import type { PersistedPayload } from '../db/db'
+import {
   buildTaskPromptBundle,
   getTaskContextBudget,
   getTaskRetryPolicy,
@@ -205,6 +212,60 @@ const buildWebLLMGenerationOptions = (
 
 const makeStructuredFailure = (message: string): Error => new Error(message)
 
+const LEGACY_RUN_TOOL_ID = 'inference'
+
+const readDispatchSettings = () => useSettingsStore.getState()
+
+const resolveExecutionLocality = (providerId: ProviderId) => getProviderLocality(providerId) ?? 'cloud'
+
+const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError'
+
+const makeRunInputSnapshot = (value: Record<string, unknown>): PersistedPayload => value as PersistedPayload
+
+const buildStructuredRunInputSnapshot = <TTask extends InferenceTaskId>(
+  task: TTask,
+  input: StructuredTaskInputMap[TTask],
+  temperature: number,
+  maxTokens: number,
+  stopSequences: string[],
+  thinking: boolean,
+): Record<string, unknown> => ({
+  kind: 'structured',
+  task,
+  input,
+  temperature,
+  maxTokens,
+  stopSequences,
+  thinking,
+})
+
+const buildLegacyRunInputSnapshot = (
+  systemPrompt: string,
+  userPrompt: string,
+  temperature: number,
+  maxTokens: number,
+  stopSequences: string[],
+  thinking: boolean,
+): Record<string, unknown> => ({
+  kind: 'legacy',
+  systemPrompt,
+  userPrompt,
+  temperature,
+  maxTokens,
+  stopSequences,
+  thinking,
+})
+
+const ensurePolicyAllows = (providerId: ProviderId) => {
+  const privacyMode = readDispatchSettings().privacyMode
+  const decision = evaluateExecutionPolicy(privacyMode, providerId)
+  if (!decision.allowed) {
+    throw new Error(decision.reason)
+  }
+
+  return decision
+}
+
 export interface UseInferenceReturn {
   activeProvider: ProviderId;
   setActiveProvider: (p: ProviderId) => void;
@@ -224,7 +285,6 @@ export function useInference(): UseInferenceReturn {
   const webLLM = useWebLLM()
   const {
     apiKeys,
-    baseUrls,
     selectedModels,
     setSelectedModel: persistSelectedModel,
     privacyMode,
@@ -279,11 +339,21 @@ export function useInference(): UseInferenceReturn {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
-
-    void webLLM.abort()
   }
 
   const clearError = () => setErrorMsg(null)
+
+  const trackAttemptExecution = async (
+    runTracker: RunRecordHandle | null,
+    providerId: ProviderId,
+    modelId: string,
+  ) => {
+    await runTracker?.updateExecution({
+      providerId,
+      modelId,
+      locality: resolveExecutionLocality(providerId),
+    })
+  }
 
   const generateCloudText = async (
     provider: Exclude<ProviderId, 'webgpu'>,
@@ -294,49 +364,48 @@ export function useInference(): UseInferenceReturn {
     onChunk: (chunk: string) => void,
     signal: AbortSignal,
   ): Promise<string> => {
+    const dispatchSettings = readDispatchSettings()
+    ensurePolicyAllows(provider)
+
     const providerConfig = {
-      apiKey: apiKeys[provider],
-      baseUrl: baseUrls[provider],
-      selectedModel: selectedModels[provider] || PROVIDER_DEFAULT_MODELS[provider],
+      apiKey: dispatchSettings.apiKeys[provider],
+      baseUrl: dispatchSettings.baseUrls[provider],
+      selectedModel: dispatchSettings.selectedModels[provider] || PROVIDER_DEFAULT_MODELS[provider],
     }
 
-    return new Promise<string>((resolve, reject) => {
-      void streamLLM(
-        provider,
-        providerConfig,
-        {
-          prompt: userPrompt,
-          systemPrompt,
-          temperature,
-          maxTokens,
-        },
-        {
-          onChunk: (chunk) => {
-            if (signal.aborted) {
-              return
-            }
-            onChunk(chunk)
-          },
-          onComplete: (fullText) => {
-            if (signal.aborted) {
-              reject(makeAbortError())
-              return
-            }
+    let fullText = ''
 
-            resolve(fullText)
-          },
-          onError: (error) => {
-            if (signal.aborted) {
-              reject(makeAbortError())
-              return
-            }
+    await streamLLM(
+      provider,
+      providerConfig,
+      {
+        prompt: userPrompt,
+        systemPrompt,
+        temperature,
+        maxTokens,
+      },
+      {
+        onChunk: (chunk) => {
+          if (signal.aborted) {
+            return
+          }
 
-            reject(error)
-          },
+          onChunk(chunk)
         },
-        signal,
-      )
-    })
+        onComplete: (text) => {
+          if (signal.aborted) {
+            return
+          }
+
+          fullText = text
+        },
+        onError: () => undefined,
+      },
+      { privacyMode: dispatchSettings.privacyMode },
+      signal,
+    )
+
+    return fullText
   }
 
   const generateWebLLMText = async (
@@ -347,6 +416,8 @@ export function useInference(): UseInferenceReturn {
     onChunk: (chunk: string) => void,
     signal: AbortSignal,
   ): Promise<string> => {
+    ensurePolicyAllows('webgpu')
+
     if (!webLLM.isSupported) {
       throw new Error('WebGPU is not supported on this browser/device.')
     }
@@ -388,8 +459,11 @@ export function useInference(): UseInferenceReturn {
     maxTokens: number,
     stopSequences: string | string[] | undefined,
     thinking: boolean | undefined,
+    runTracker: RunRecordHandle | null,
     signal: AbortSignal,
   ): Promise<string> => {
+    await trackAttemptExecution(runTracker, 'webgpu', modelId)
+
     const noChunk = () => undefined
     const primary = await generateWebLLMText(
       modelId,
@@ -440,8 +514,15 @@ export function useInference(): UseInferenceReturn {
     promptBundle: ReturnType<typeof buildTaskPromptBundle>,
     temperature: number,
     maxTokens: number,
+    runTracker: RunRecordHandle | null,
     signal: AbortSignal,
   ): Promise<string> => {
+    await trackAttemptExecution(
+      runTracker,
+      provider,
+      readDispatchSettings().selectedModels[provider] || PROVIDER_DEFAULT_MODELS[provider],
+    )
+
     const noChunk = () => undefined
     const primary = await generateCloudText(
       provider,
@@ -485,19 +566,21 @@ export function useInference(): UseInferenceReturn {
   const runStructuredInference = async <TTask extends InferenceTaskId>(
     opts: StructuredRunInferenceOptions<TTask>,
     controller: AbortController,
-  ): Promise<void> => {
+    runTracker: RunRecordHandle | null,
+  ): Promise<string> => {
     const taskSpec = getTaskSpec(opts.task)
     const promptBundle = buildTaskPromptBundle(opts.task as never, opts.input as never)
     const temperature = opts.temperature ?? promptBundle.temperature
     const maxTokens = opts.maxTokens ?? promptBundle.maxTokens
     const stopSequences = mergeStopSequences(promptBundle.stopSequences, opts.stopSequences)
     const thinking = opts.thinking ?? false
-    const allowLocalEscalation = settings.allowLocalModelEscalation
+    const dispatchSettings = readDispatchSettings()
+    const allowLocalEscalation = dispatchSettings.allowLocalModelEscalation
     const remoteFallbackProvider = resolveRemoteCloudProvider(
-      apiKeys,
+      dispatchSettings.apiKeys,
       activeProvider === 'webgpu' ? undefined : activeProvider,
     )
-    const webLLMModelToUse = selectedModels.webgpu || PROVIDER_DEFAULT_MODELS.webgpu
+    const webLLMModelToUse = dispatchSettings.selectedModels.webgpu || PROVIDER_DEFAULT_MODELS.webgpu
     const preferredWebLLMModel = resolveCompatibleWebLLMModel(
       webLLMModelToUse,
       opts.task,
@@ -522,6 +605,7 @@ export function useInference(): UseInferenceReturn {
           maxTokens,
           stopSequences,
           thinking,
+          runTracker,
           controller.signal,
         )
       }
@@ -533,6 +617,7 @@ export function useInference(): UseInferenceReturn {
         promptBundle,
         temperature,
         maxTokens,
+        runTracker,
         controller.signal,
       )
     }
@@ -540,18 +625,20 @@ export function useInference(): UseInferenceReturn {
     try {
       const finalText = await tryCurrentProvider()
       if (controller.signal.aborted) {
-        return
+        throw makeAbortError()
       }
 
       opts.onComplete(finalText)
-      return
+      return finalText
     } catch (primaryError) {
       if (controller.signal.aborted) {
         throw primaryError
       }
 
+      const latestSettings = readDispatchSettings()
+
       if (activeProvider === 'webgpu') {
-        if (!privacyMode && settings.allowCloudFallback && remoteFallbackProvider) {
+        if (!latestSettings.privacyMode && latestSettings.allowCloudFallback && remoteFallbackProvider) {
           const fallbackText = await runStructuredForProvider(
             remoteFallbackProvider,
             opts.task,
@@ -559,14 +646,18 @@ export function useInference(): UseInferenceReturn {
             promptBundle,
             temperature,
             maxTokens,
+            runTracker,
             controller.signal,
           )
           if (!controller.signal.aborted) {
             opts.onComplete(fallbackText)
           }
-          return
+          if (controller.signal.aborted) {
+            throw makeAbortError()
+          }
+          return fallbackText
         }
-      } else if (!privacyMode && settings.allowCloudFallback && remoteFallbackProvider) {
+      } else if (!latestSettings.privacyMode && latestSettings.allowCloudFallback && remoteFallbackProvider) {
         const fallbackText = await runStructuredForProvider(
           remoteFallbackProvider,
           opts.task,
@@ -574,13 +665,17 @@ export function useInference(): UseInferenceReturn {
           promptBundle,
           temperature,
           maxTokens,
+          runTracker,
           controller.signal,
         )
         if (!controller.signal.aborted) {
           opts.onComplete(fallbackText)
         }
-        return
-      } else if (allowLocalEscalation && preferredWebLLMModel) {
+        if (controller.signal.aborted) {
+          throw makeAbortError()
+        }
+        return fallbackText
+      } else if (latestSettings.allowLocalModelEscalation && preferredWebLLMModel) {
         const fallbackText = await runStructuredForWebLLM(
           opts.task,
           opts.input,
@@ -590,12 +685,16 @@ export function useInference(): UseInferenceReturn {
           maxTokens,
           stopSequences,
           thinking,
+          runTracker,
           controller.signal,
         )
         if (!controller.signal.aborted) {
           opts.onComplete(fallbackText)
         }
-        return
+        if (controller.signal.aborted) {
+          throw makeAbortError()
+        }
+        return fallbackText
       }
 
       throw primaryError
@@ -610,75 +709,112 @@ export function useInference(): UseInferenceReturn {
     const controller = new AbortController()
     abortControllerRef.current = controller
 
+    const dispatchSettings = readDispatchSettings()
+    const executionModelId = activeProvider === 'webgpu'
+      ? dispatchSettings.selectedModels.webgpu || selectedModel || PROVIDER_DEFAULT_MODELS.webgpu
+      : dispatchSettings.selectedModels[activeProvider] || selectedModel || PROVIDER_DEFAULT_MODELS[activeProvider]
+    const initialExecution = {
+      providerId: activeProvider,
+      modelId: executionModelId,
+      locality: resolveExecutionLocality(activeProvider),
+    }
+
+    const runTracker = await createRunRecord({
+      toolId: isStructuredRunInferenceOptions(opts) ? opts.task : LEGACY_RUN_TOOL_ID,
+      toolVersion: 1,
+      actionId: isStructuredRunInferenceOptions(opts) ? opts.task : undefined,
+      input: makeRunInputSnapshot(
+        isStructuredRunInferenceOptions(opts)
+          ? buildStructuredRunInputSnapshot(
+              opts.task,
+              opts.input,
+              opts.temperature ?? 0.3,
+              opts.maxTokens ?? 2048,
+              mergeStopSequences([], opts.stopSequences),
+              opts.thinking ?? false,
+            )
+          : buildLegacyRunInputSnapshot(
+              opts.systemPrompt,
+              opts.userPrompt,
+              opts.temperature ?? 0.3,
+              opts.maxTokens ?? 2048,
+              mergeStopSequences([], opts.stopSequences),
+              opts.thinking ?? false,
+            ),
+      ),
+      execution: initialExecution,
+    })
+
+    await runTracker.markRunning(initialExecution)
+
     try {
       if (isStructuredRunInferenceOptions(opts)) {
-        await runStructuredInference(opts, controller)
+        const finalText = await runStructuredInference(opts, controller, runTracker)
+        if (controller.signal.aborted) throw makeAbortError()
+
+        await runTracker.complete(finalText)
         return
       }
 
       if (activeProvider === 'webgpu') {
-        if (!webLLM.isSupported) {
-          throw new Error('WebGPU is not supported on this browser/device.')
-        }
+        await trackAttemptExecution(runTracker, 'webgpu', executionModelId)
 
-        if (controller.signal.aborted) return
-
-        const result = await webLLM.generate(
-          selectedModel || PROVIDER_DEFAULT_MODELS.webgpu,
-          opts.userPrompt,
+        const result = await generateWebLLMText(
+          executionModelId,
           opts.systemPrompt,
+          opts.userPrompt,
+          buildWebLLMGenerationOptions(
+            opts.temperature ?? 0.3,
+            opts.maxTokens,
+            opts.stopSequences,
+            opts.thinking,
+          ),
           (chunk) => {
             if (controller.signal.aborted) return
             opts.onChunk(chunk)
           },
-          {
-            ...buildWebLLMGenerationOptions(
-              opts.temperature ?? 0.3,
-              opts.maxTokens,
-              opts.stopSequences,
-              opts.thinking,
-            ),
-            signal: controller.signal,
-          },
+          controller.signal,
         )
 
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted) throw makeAbortError()
         opts.onComplete(result)
+
+        await runTracker.complete(result)
       } else {
-        await streamLLM(
+        await trackAttemptExecution(runTracker, activeProvider, executionModelId)
+
+        const fullText = await generateCloudText(
           activeProvider,
-          {
-            apiKey: apiKeys[activeProvider],
-            baseUrl: baseUrls[activeProvider],
-            selectedModel,
+          opts.systemPrompt,
+          opts.userPrompt,
+          opts.temperature ?? 0.3,
+          opts.maxTokens ?? 2048,
+          (chunk) => {
+            if (controller.signal.aborted) return
+            opts.onChunk(chunk)
           },
-          {
-            prompt: opts.userPrompt,
-            systemPrompt: opts.systemPrompt,
-            temperature: opts.temperature ?? 0.3,
-            maxTokens: opts.maxTokens,
-          },
-          {
-            onChunk: (chunk) => {
-              if (controller.signal.aborted) return
-              opts.onChunk(chunk)
-            },
-            onComplete: (fullText) => {
-              if (controller.signal.aborted) return
-              opts.onComplete(fullText)
-            },
-            onError: (err) => {
-              if (controller.signal.aborted) return
-              setErrorMsg(err.message || 'Stream processing failed.')
-            },
-          },
-          controller.signal
+          controller.signal,
         )
+
+        if (controller.signal.aborted) throw makeAbortError()
+        opts.onComplete(fullText)
+
+        await runTracker.complete(fullText)
       }
-    } catch (err: any) {
-      if (controller.signal.aborted) return
+    } catch (err: unknown) {
+      if (controller.signal.aborted || isAbortError(err)) {
+        await runTracker.cancel()
+        return
+      }
+
       console.error(err)
-      setErrorMsg(err.message || 'An error occurred during inference.')
+      const message = err instanceof Error ? err.message : 'An error occurred during inference.'
+      setErrorMsg(message)
+
+      await runTracker.fail({
+        code: 'inference_failed',
+        message,
+      })
     } finally {
       if (abortControllerRef.current === controller) {
         setIsProcessing(false)

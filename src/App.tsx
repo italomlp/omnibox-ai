@@ -98,7 +98,7 @@ const App: React.FC = () => {
   const isDrawerOpen = ui.sidebarOpen && isMobileViewport
 
   return (
-    <div className="flex min-h-screen overflow-x-clip bg-zinc-950 text-zinc-100 antialiased font-sans">
+    <div className="app-main-layout flex min-h-screen overflow-x-clip bg-zinc-950 text-zinc-100 antialiased font-sans">
       <AppSidebar
         route={ui.route}
         sidebarOpen={ui.sidebarOpen}
@@ -108,7 +108,7 @@ const App: React.FC = () => {
         privacyMode={settings.privacyMode}
       />
 
-      <div className="flex flex-1 min-w-0 flex-col bg-[#09090b]">
+      <div className="app-main-content flex flex-1 min-w-0 flex-col bg-[#09090b]">
         <AppHeader
           title={routeTitle}
           subtitle={routeSubtitle}

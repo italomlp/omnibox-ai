@@ -67,7 +67,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           }`}
       >
         {/* Brand Header */}
-        <div className={`flex h-16 items-center border-b border-zinc-900/60 flex-shrink-0 ${sidebarOpen ? 'justify-between px-4' : 'justify-center px-0'}`}>
+        <div className={`flex min-h-16 items-center border-b border-zinc-900/60 flex-shrink-0 ${sidebarOpen ? 'justify-between px-4' : 'justify-center px-0'}`}>
           {sidebarOpen ? (
             <>
               <div className="flex items-center gap-2.5 overflow-hidden">
@@ -88,13 +88,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               </button>
             </>
           ) : (
-            <>
+            <div className="flex flex-col gap-4 my-4 items-center">
               {/* Logo for mobile hidden state, Toggle for desktop collapsed state */}
-              <div className="flex items-center justify-center md:hidden w-full">
+              {/* <div className="flex items-center justify-center w-full"> */}
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30 flex-shrink-0">
                   Ω
                 </div>
-              </div>
+              {/* </div> */}
               <button
                 type="button"
                 onClick={onToggleSidebar}
@@ -103,7 +103,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
-            </>
+            </div>
           )}
         </div>
 

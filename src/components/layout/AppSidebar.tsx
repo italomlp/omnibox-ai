@@ -67,25 +67,44 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           }`}
       >
         {/* Brand Header */}
-        <div className="flex h-16 items-center justify-between px-4 border-b border-zinc-900/60 flex-shrink-0">
-          <div className={`flex items-center gap-2.5 overflow-hidden ${!sidebarOpen ? 'justify-center w-full' : ''}`}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30 flex-shrink-0">
-              Ω
-            </div>
-            <span className={`${expandedContentClass} font-bold text-sm bg-gradient-to-r from-indigo-200 to-indigo-400 bg-clip-text text-transparent truncate tracking-tight`}>
-              OmniBox AI
-            </span>
-          </div>
-          <div className={expandedContentClass}>
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="theme-icon-button p-1 rounded-md hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-colors"
-              aria-label="Close sidebar"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          </div>
+        <div className={`flex h-16 items-center border-b border-zinc-900/60 flex-shrink-0 ${sidebarOpen ? 'justify-between px-4' : 'justify-center px-0'}`}>
+          {sidebarOpen ? (
+            <>
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30 flex-shrink-0">
+                  Ω
+                </div>
+                <span className="font-bold text-sm bg-gradient-to-r from-indigo-200 to-indigo-400 bg-clip-text text-transparent truncate tracking-tight">
+                  OmniBox AI
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="theme-icon-button p-1 rounded-md hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-colors"
+                aria-label="Close sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Logo for mobile hidden state, Toggle for desktop collapsed state */}
+              <div className="flex items-center justify-center md:hidden w-full">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white shadow-md shadow-indigo-600/30 flex-shrink-0">
+                  Ω
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="theme-icon-button hidden md:flex p-1 rounded-md hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-colors"
+                aria-label="Expand sidebar"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Primary Navigation */}
@@ -121,61 +140,80 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           })}
         </nav>
 
-        <div className="border-t border-zinc-900/60 px-3 py-3">
-          <div className="rounded-2xl border border-zinc-800/60 bg-zinc-950/70 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Active tool</div>
-              {route.view === 'tool' ? (
-                <span className="rounded-full border border-emerald-900/40 bg-emerald-950/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                  Selected
-                </span>
-              ) : null}
-            </div>
+        <div className={`border-t border-zinc-900/60 ${sidebarOpen ? 'px-3 py-3' : 'py-3 flex justify-center'}`}>
+          {sidebarOpen ? (
+            <div className="rounded-2xl border border-zinc-800/60 bg-zinc-950/70 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Active tool</div>
+                {route.view === 'tool' ? (
+                  <span className="rounded-full border border-emerald-900/40 bg-emerald-950/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                    Selected
+                  </span>
+                ) : null}
+              </div>
 
-            {activeTool ? (
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-indigo-400" />
-                  <div className={`min-w-0 ${expandedContentClass}`}>
-                    <div className="truncate text-sm font-medium text-zinc-100">{activeTool.title}</div>
-                    <div className="truncate text-[11px] text-zinc-500">{getToolCategory(activeTool.categoryId).title}</div>
+              {activeTool ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-indigo-400" />
+                    <div className="min-w-0 block">
+                      <div className="truncate text-sm font-medium text-zinc-100">{activeTool.title}</div>
+                      <div className="truncate text-[11px] text-zinc-500">{getToolCategory(activeTool.categoryId).title}</div>
+                    </div>
                   </div>
+                  <p className="block text-[11px] leading-5 text-zinc-500">{activeTool.description}</p>
                 </div>
-                <p className={`${expandedContentClass} text-[11px] leading-5 text-zinc-500`}>{activeTool.description}</p>
-              </div>
-            ) : (
-              <div className={`mt-3 ${expandedContentClass} text-[11px] leading-5 text-zinc-500`}>
-                Choose a tool from the catalog to surface it here.
-              </div>
-            )}
+              ) : (
+                <div className="mt-3 block text-[11px] leading-5 text-zinc-500">
+                  Choose a tool from the catalog to surface it here.
+                </div>
+              )}
 
-            <button
-              type="button"
-              onClick={() => onNavigate({ view: 'tools' })}
-              className={`mt-3 inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800 ${!sidebarOpen ? 'w-full justify-center' : ''}`}
-            >
-              <Layers3 className="h-3.5 w-3.5" />
-              <span className={expandedContentClass}>Browse tools</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => onNavigate({ view: 'tools' })}
+                className="mt-3 inline-flex w-full justify-center items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800"
+              >
+                <Layers3 className="h-3.5 w-3.5" />
+                <span>Browse tools</span>
+              </button>
+            </div>
+          ) : (
+            activeTool ? (
+              <button
+                onClick={() => onNavigate({ view: 'tool', tool: activeTool.id })}
+                className="theme-icon-button flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-900/40 bg-indigo-950/20 text-indigo-400 hover:bg-indigo-900/30 transition-all"
+                title={`Active Tool: ${activeTool.title}`}
+                aria-label={`Active Tool: ${activeTool.title}`}
+              >
+                <Sparkles className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => onNavigate({ view: 'tools' })}
+                className="theme-icon-button flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200 transition-all"
+                title="Browse catalog"
+                aria-label="Browse catalog"
+              >
+                <Layers3 className="h-4 w-4" />
+              </button>
+            )
+          )}
         </div>
 
         {/* Sidebar Footer Indicators */}
         <div className="p-3 border-t border-zinc-900/60 space-y-2 flex-shrink-0">
-          {/* Collapse toggle when narrow */}
-          {!sidebarOpen && (
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="theme-icon-button w-full hidden md:flex h-8 items-center justify-center rounded-lg hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-all"
-              aria-label="Expand sidebar"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
-
           {/* WebGPU Status Indicator */}
-          <div className={`status-card flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-900/20 text-xs border border-zinc-900/40 ${!sidebarOpen ? 'justify-center' : ''}`}>
+          <div 
+            className={`status-card flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-900/20 text-xs border border-zinc-900/40 ${!sidebarOpen ? 'justify-center' : ''}`}
+            title={
+              webGpuSupported === null
+                ? 'Verifying GPU...'
+                : webGpuSupported
+                ? 'WebGPU Active'
+                : 'No WebGPU'
+            }
+          >
             <Cpu className={`w-3.5 h-3.5 flex-shrink-0 ${
               webGpuSupported === null
                 ? 'text-zinc-500'
@@ -183,22 +221,29 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 ? 'text-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.3)] animate-none'
                 : 'text-yellow-500'
             }`} />
-            <span className={`${expandedContentClass} text-[10px] text-zinc-400 truncate`}>
-              {webGpuSupported === null
-                ? 'Verifying GPU...'
-                : webGpuSupported
-                ? 'WebGPU Active'
-                : 'No WebGPU'}
-            </span>
+            {sidebarOpen && (
+              <span className="text-[10px] text-zinc-400 truncate">
+                {webGpuSupported === null
+                  ? 'Verifying GPU...'
+                  : webGpuSupported
+                  ? 'WebGPU Active'
+                  : 'No WebGPU'}
+              </span>
+            )}
           </div>
 
           {/* Privacy Indicator */}
           {privacyMode && (
-            <div className={`status-card status-card-success flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-xs ${!sidebarOpen ? 'justify-center' : ''}`}>
+            <div 
+              className={`status-card status-card-success flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-xs ${!sidebarOpen ? 'justify-center' : ''}`}
+              title="Privacy Locked"
+            >
               <Shield className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
-              <span className={`${expandedContentClass} text-[10px] text-emerald-300 font-semibold truncate leading-none`}>
-                Privacy Locked
-              </span>
+              {sidebarOpen && (
+                <span className="text-[10px] text-emerald-300 font-semibold truncate leading-none">
+                  Privacy Locked
+                </span>
+              )}
             </div>
           )}
         </div>

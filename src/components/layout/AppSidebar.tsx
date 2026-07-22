@@ -37,7 +37,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   privacyMode,
 }) => {
   const isMobile = useIsMobileViewport()
-  const expandedContentClass = sidebarOpen ? 'block' : 'block md:hidden'
+  const expandedContentClass = sidebarOpen ? 'block' : 'hidden'
   const activePrimaryView = route.view === 'tool' ? 'tools' : route.view
 
   const activeTool = useMemo(() => (route.view === 'tool' ? getTool(route.tool) : null), [route])

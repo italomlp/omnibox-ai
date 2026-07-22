@@ -501,6 +501,9 @@ html.light .glass-panel-hover:hover {
 }
 
 /* Textcolor overrides */
+html.light .text-zinc-50 {
+  color: #09090b !important;
+}
 html.light .text-zinc-100 {
   color: #09090b !important; /* Active primary text */
 }

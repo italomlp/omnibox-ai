@@ -14,6 +14,7 @@
     "@mlc-ai/web-llm": "^0.2.84",
     "@tailwindcss/vite": "^4.3.2",
     "dexie": "^4.4.4",
+    "harper.js": "2.4.0",
     "lucide-react": "^1.23.0",
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^6.1.200",

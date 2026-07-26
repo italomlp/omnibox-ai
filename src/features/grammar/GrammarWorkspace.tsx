@@ -6,10 +6,14 @@ import { ProviderSelector } from '../../components/shared/ProviderSelector'
 import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
 import { ErrorAlert } from '../../components/shared/ErrorAlert'
 import { harperGrammar, type LocalGrammarDiagnostic } from './harperGrammar'
+import { HarperDiagnosticEditor } from './HarperDiagnosticEditor'
 import {
+  LOCAL_GRAMMAR_DEBOUNCE_MS,
   applyLocalGrammarSuggestion,
   dispatchGrammarCheck,
+  shouldApplyLocalGrammarResult,
   shouldApplyInferenceResult,
+  shouldApplyLocalSuggestion,
   shouldShowGrammarProviderControls,
   type GrammarMode,
 } from './grammarWorkspaceHelpers'
@@ -51,7 +55,12 @@ export const GrammarWorkspace: React.FC = () => {
   const [localDiagnostics, setLocalDiagnostics] = useState<LocalGrammarDiagnostic[]>([])
   const [localGrammarStatus, setLocalGrammarStatus] = useState<'idle' | 'checking' | 'ready' | 'unavailable'>('idle')
   const [localGrammarMessage, setLocalGrammarMessage] = useState<string | null>(null)
+  const [isComposing, setIsComposing] = useState(false)
   const inputRevision = React.useRef(0)
+  const grammarModeRevision = React.useRef(0)
+  const localLintRequestId = React.useRef(0)
+  const localLintTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipNextLocalDebounce = React.useRef<{ text: string; revision: number } | null>(null)
 
   React.useEffect(() => {
     const reload = localStorage.getItem('omnibox-grammar-reload')
@@ -95,48 +104,40 @@ export const GrammarWorkspace: React.FC = () => {
 
   const handleInputChange = (value: string) => {
     inputRevision.current += 1
+    localLintRequestId.current += 1
     setInput(value)
     setLocalDiagnostics([])
     setLocalGrammarStatus('idle')
     setLocalGrammarMessage(null)
   }
 
-  const executeInference = async (
-    task: 'grammar' | 'tone',
-    input: GrammarTaskInput | ToneTaskInput,
-  ) => {
-    const executionInputRevision = inputRevision.current
-    setOutput('')
-    setResultSource('ai')
-
-    await runInference({
-      task,
-      input,
-      toolId: 'grammar-tone',
-      temperature: task === 'grammar' ? 0 : 0.1,
-      onComplete: async (fullText) => {
-        if (!shouldApplyInferenceResult(executionInputRevision, inputRevision.current)) {
-          return
-        }
-
-        const finalResult = parseStructuredRewriteResult(fullText)
-        setOutput(finalResult)
-      },
-    })
+  const handleCompositionStart = () => {
+    if (localLintTimeout.current) {
+      clearTimeout(localLintTimeout.current)
+      localLintTimeout.current = null
+    }
+    setIsComposing(true)
   }
 
-  const handleLocalGrammarCheck = async () => {
-    if (!input.trim()) return
-    const checkedInputRevision = inputRevision.current
+  const handleCompositionEnd = () => {
+    setIsComposing(false)
+  }
+
+  const runLocalGrammarCheck = React.useCallback(async (text: string, checkedInputRevision: number) => {
+    if (!text.trim()) return
+
+    const requestId = ++localLintRequestId.current
     setOutput('')
     setResultSource('local')
     setLocalDiagnostics([])
     setLocalGrammarMessage(null)
     setLocalGrammarStatus('checking')
 
-    const result = await dispatchGrammarCheck('local', input, harperGrammar.diagnose, async () => undefined)
-    if (!result || checkedInputRevision !== inputRevision.current) return
-    if (result.status === 'stale') return
+    const result = await dispatchGrammarCheck('local', text, harperGrammar.diagnose, async () => undefined)
+    if (!result || result.status === 'stale') return
+    if (!shouldApplyLocalGrammarResult(requestId, localLintRequestId.current, checkedInputRevision, inputRevision.current)) {
+      return
+    }
 
     if (result.status === 'unavailable') {
       setLocalGrammarStatus('unavailable')
@@ -146,6 +147,70 @@ export const GrammarWorkspace: React.FC = () => {
 
     setLocalDiagnostics(result.diagnostics)
     setLocalGrammarStatus('ready')
+  }, [])
+
+  React.useEffect(() => {
+    if (grammarMode !== 'local' || isComposing || !input.trim()) return
+
+    const scheduledRevision = inputRevision.current
+    const skippedLint = skipNextLocalDebounce.current
+    if (skippedLint?.text === input && skippedLint.revision === scheduledRevision) {
+      skipNextLocalDebounce.current = null
+      return
+    }
+
+    // Debounce keeps local lint responsive without running a worker job per keystroke.
+    localLintTimeout.current = setTimeout(() => {
+      localLintTimeout.current = null
+      void runLocalGrammarCheck(input, scheduledRevision)
+    }, LOCAL_GRAMMAR_DEBOUNCE_MS)
+
+    return () => {
+      if (localLintTimeout.current) {
+        clearTimeout(localLintTimeout.current)
+        localLintTimeout.current = null
+      }
+    }
+  }, [grammarMode, input, isComposing, runLocalGrammarCheck])
+
+  const executeInference = async (
+    task: 'grammar' | 'tone',
+    input: GrammarTaskInput | ToneTaskInput,
+  ) => {
+    const executionInputRevision = inputRevision.current
+    const executionModeRevision = grammarModeRevision.current
+    setOutput('')
+    setResultSource('ai')
+
+    await runInference({
+      task,
+      input,
+      toolId: 'grammar-tone',
+      temperature: task === 'grammar' ? 0 : 0.1,
+      onComplete: async (fullText) => {
+        if (!shouldApplyInferenceResult(
+          executionInputRevision,
+          inputRevision.current,
+          executionModeRevision,
+          grammarModeRevision.current,
+        )) {
+          return
+        }
+
+        const finalResult = parseStructuredRewriteResult(fullText)
+        setOutput(finalResult)
+      },
+    })
+  }
+
+  const handleLocalGrammarCheck = () => {
+    if (isComposing) return
+
+    if (localLintTimeout.current) {
+      clearTimeout(localLintTimeout.current)
+      localLintTimeout.current = null
+    }
+    void runLocalGrammarCheck(input, inputRevision.current)
   }
 
   const handleFixGrammar = () => {
@@ -164,12 +229,18 @@ export const GrammarWorkspace: React.FC = () => {
     if (!suggestion) return
 
     const appliedInputRevision = inputRevision.current
+    if (!shouldApplyLocalSuggestion(diagnostic.sourceText, input, appliedInputRevision, inputRevision.current)) return
 
     try {
-      const updatedInput = await applyLocalGrammarSuggestion(suggestion)
-      if (appliedInputRevision !== inputRevision.current) return
+      const updatedInput = await applyLocalGrammarSuggestion(suggestion, diagnostic.sourceText)
+      if (updatedInput === null || !shouldApplyLocalSuggestion(diagnostic.sourceText, input, appliedInputRevision, inputRevision.current)) {
+        return
+      }
 
       handleInputChange(updatedInput)
+      // Apply uses Harper's source-bound suggestion; lint the resulting text immediately.
+      skipNextLocalDebounce.current = { text: updatedInput, revision: inputRevision.current }
+      void runLocalGrammarCheck(updatedInput, inputRevision.current)
     } catch (error) {
       if (appliedInputRevision !== inputRevision.current) return
 
@@ -177,6 +248,18 @@ export const GrammarWorkspace: React.FC = () => {
       setLocalGrammarStatus('unavailable')
       setLocalGrammarMessage(error instanceof Error ? error.message : 'Unable to apply this suggestion.')
     }
+  }
+
+  const handleGrammarModeChange = (mode: GrammarMode) => {
+    grammarModeRevision.current += 1
+    localLintRequestId.current += 1
+    setIsComposing(false)
+    setOutput('')
+    setResultSource('local')
+    setLocalDiagnostics([])
+    setLocalGrammarStatus('idle')
+    setLocalGrammarMessage(null)
+    setGrammarMode(mode)
   }
 
   const handleShiftTone = () => {
@@ -218,7 +301,7 @@ export const GrammarWorkspace: React.FC = () => {
               name="grammar-mode"
               value="local"
               checked={grammarMode === 'local'}
-              onChange={() => setGrammarMode('local')}
+              onChange={() => handleGrammarModeChange('local')}
               className="mt-0.5 accent-emerald-500"
             />
             <span className="min-w-0">
@@ -232,7 +315,7 @@ export const GrammarWorkspace: React.FC = () => {
               name="grammar-mode"
               value="ai"
               checked={grammarMode === 'ai'}
-              onChange={() => setGrammarMode('ai')}
+              onChange={() => handleGrammarModeChange('ai')}
               className="mt-0.5 accent-indigo-500"
             />
             <span className="min-w-0">
@@ -282,12 +365,28 @@ export const GrammarWorkspace: React.FC = () => {
             <span className="text-[10px] text-zinc-500">{input.length} characters</span>
           </div>
 
-          <textarea
-            value={input}
-            onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="Type or paste text content to rewrite..."
-            className="glass-input control-touch min-h-[220px] max-h-[400px] w-full resize-y rounded-lg border border-zinc-800/60 bg-zinc-950/60 p-4 text-sm text-zinc-200"
-          />
+          {grammarMode === 'local' ? (
+            <HarperDiagnosticEditor
+              value={input}
+              diagnostics={localDiagnostics}
+              onChange={handleInputChange}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              onApplySuggestion={(diagnostic, suggestionIndex) => void handleApplySuggestion(diagnostic, suggestionIndex)}
+              placeholder="Type or paste text content to check locally..."
+              aria-label="Local English grammar editor"
+              className="max-h-[400px] text-zinc-200"
+            />
+          ) : (
+            <textarea
+              value={input}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              placeholder="Type or paste text content to rewrite..."
+              className="glass-input control-touch min-h-[220px] max-h-[400px] w-full resize-y rounded-lg border border-zinc-800/60 bg-zinc-950/60 p-4 text-sm text-zinc-200"
+            />
+          )}
 
           <div className="flex items-center gap-2 border-t border-zinc-900 pt-2">
             <button
@@ -344,22 +443,9 @@ export const GrammarWorkspace: React.FC = () => {
                  Local grammar diagnostics are unavailable. {localGrammarMessage}
                </div>
               ) : resultSource === 'local' && localDiagnostics.length > 0 ? (
-               <ul className="space-y-2" aria-label="Local grammar diagnostics">
-                 {localDiagnostics.map((diagnostic) => (
-                   <li key={diagnostic.id} className="rounded-lg border border-zinc-800 bg-zinc-950/30 p-3">
-                     <p className="text-xs text-zinc-200">{diagnostic.message}</p>
-                     {diagnostic.suggestions.length > 0 && (
-                       <div className="mt-2 flex flex-wrap gap-2">
-                         {diagnostic.suggestions.map((suggestion, suggestionIndex) => (
-                           <button key={`${diagnostic.id}:${suggestion.replacement}:${suggestionIndex}`} type="button" onClick={() => void handleApplySuggestion(diagnostic, suggestionIndex)} className="button-secondary control-standard text-[11px] text-emerald-300 hover:text-emerald-200">
-                             Apply “{suggestion.replacement}”
-                           </button>
-                         ))}
-                       </div>
-                     )}
-                   </li>
-                 ))}
-                </ul>
+                <div className="rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-3 text-xs leading-relaxed text-emerald-300" role="status">
+                  {localDiagnostics.length} issue{localDiagnostics.length === 1 ? '' : 's'} found. Use the highlighted editor to review and apply fixes.
+                </div>
               ) : resultSource === 'local' && localGrammarStatus === 'ready' ? (
                 <div className="rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-3 text-xs leading-relaxed text-emerald-300" role="status">
                   No grammar issues found.
@@ -375,8 +461,8 @@ export const GrammarWorkspace: React.FC = () => {
         </div>
       </div>
 
-      {/* Tone Shifter Sliders Panel */}
-      <div className="surface-nested space-y-4 rounded-xl border border-zinc-800/40 p-4">
+      {/* Tone Rewrite is an AI-only workflow. */}
+      {grammarMode === 'ai' && <div className="surface-nested space-y-4 rounded-xl border border-zinc-800/40 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Tone Shifter Sliders</h3>
           {selectedModel.toLowerCase().includes('1b') && (
@@ -428,7 +514,7 @@ export const GrammarWorkspace: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

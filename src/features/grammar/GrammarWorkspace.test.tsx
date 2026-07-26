@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as ReactDOMServer from 'react-dom/server'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   diagnose: vi.fn(),
@@ -34,13 +35,29 @@ import { GrammarWorkspace } from './GrammarWorkspace'
 import {
   applyLocalGrammarSuggestion,
   dispatchGrammarCheck,
+  LOCAL_GRAMMAR_DEBOUNCE_MS,
+  shouldApplyLocalGrammarResult,
   shouldApplyInferenceResult,
+  shouldApplyLocalSuggestion,
   shouldShowGrammarProviderControls,
 } from './grammarWorkspaceHelpers'
+import type { LocalGrammarDiagnostic } from './harperGrammar'
+
+const localDiagnostic: LocalGrammarDiagnostic = {
+  id: 'lint-1',
+  message: 'Use “does not” instead.',
+  range: { start: 3, end: 7 },
+  sourceText: 'It dont work.',
+  suggestions: [{
+    replacement: 'does not',
+    apply: vi.fn().mockResolvedValue('It does not work.'),
+  }],
+}
 
 describe('GrammarWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.diagnose.mockResolvedValue({ status: 'ready', diagnostics: [] })
   })
 
   it('renders the default private English grammar mode and Harper attribution without inference', () => {
@@ -67,18 +84,25 @@ describe('GrammarWorkspace', () => {
   })
 
   it('rejects an AI completion when the input changed after execution began', () => {
-    expect(shouldApplyInferenceResult(4, 5)).toBe(false)
+    expect(shouldApplyInferenceResult(4, 5, 1, 1)).toBe(false)
   })
 
   it('accepts an AI completion when the input revision is unchanged', () => {
-    expect(shouldApplyInferenceResult(4, 4)).toBe(true)
+    expect(shouldApplyInferenceResult(4, 4, 1, 1)).toBe(true)
+  })
+
+  it('rejects an AI completion when the grammar mode changed after execution began', () => {
+    expect(shouldApplyInferenceResult(4, 4, 1, 2)).toBe(false)
   })
 
   it('runs the local service instead of inference and applies its offered suggestion', async () => {
     const apply = vi.fn().mockResolvedValue('The corrected text.')
     mocks.diagnose.mockResolvedValue({
       status: 'ready',
-      diagnostics: [{ id: 'lint-1', message: 'Use “does not” instead.', suggestions: [{ replacement: 'does not', apply }] }],
+      diagnostics: [{
+        ...localDiagnostic,
+        suggestions: [{ replacement: 'does not', apply }],
+      }],
     })
 
     const result = await dispatchGrammarCheck('local', 'It dont work.', mocks.diagnose, mocks.runInference)
@@ -86,7 +110,7 @@ describe('GrammarWorkspace', () => {
     expect(mocks.diagnose).toHaveBeenCalledWith('It dont work.')
     expect(mocks.runInference).not.toHaveBeenCalled()
     if (!result || result.status !== 'ready') throw new Error('Expected local grammar diagnostics.')
-    await expect(applyLocalGrammarSuggestion(result.diagnostics[0].suggestions[0])).resolves.toBe('The corrected text.')
+    await expect(applyLocalGrammarSuggestion(result.diagnostics[0].suggestions[0], 'It dont work.')).resolves.toBe('The corrected text.')
   })
 
   it('dispatches AI grammar exactly once without a legacy history write', async () => {
@@ -96,19 +120,105 @@ describe('GrammarWorkspace', () => {
     expect(mocks.historyAdd).not.toHaveBeenCalled()
   })
 
-  it('renders local diagnostic controls without textarea highlighting', () => {
+  it('renders the in-place local diagnostic editor', () => {
     const html = ReactDOMServer.renderToStaticMarkup(<GrammarWorkspace />)
 
+    expect(html).toContain('harper-diagnostic-editor')
     expect(html).toContain('Local Diagnostics')
-    expect(html).toContain('Run a local English grammar check')
-    expect(html).not.toContain('mark')
   })
 
-  it('keeps the tone rewrite dispatch available independently of grammar mode', () => {
+  it('documents a short debounce for incremental local relinting', () => {
+    expect(LOCAL_GRAMMAR_DEBOUNCE_MS).toBe(350)
+  })
+
+  it('rejects a stale local lint completion', () => {
+    expect(shouldApplyLocalGrammarResult(3, 4, 7, 7)).toBe(false)
+  })
+
+  it('rejects a stale suggestion application before it can replace newer input', () => {
+    expect(shouldApplyLocalSuggestion('Original.', 'Edited.', 4, 5)).toBe(false)
+  })
+
+  it('accepts a Harper fix against its matching source before relinting the updated text', async () => {
+    const apply = vi.fn().mockResolvedValue('Corrected.')
+    mocks.diagnose.mockResolvedValue({ status: 'ready', diagnostics: [] })
+
+    const updatedText = await applyLocalGrammarSuggestion({ replacement: 'Corrected.', apply }, 'Original.')
+    await dispatchGrammarCheck('local', updatedText ?? '', mocks.diagnose, mocks.runInference)
+
+    expect(mocks.diagnose).toHaveBeenCalledWith('Corrected.')
+    expect(mocks.runInference).not.toHaveBeenCalled()
+  })
+
+  it('keeps tone rewrite gated behind the explicit AI grammar mode', () => {
     const html = ReactDOMServer.renderToStaticMarkup(<GrammarWorkspace />)
 
-    expect(html).toContain('Tone Shifter Sliders')
-    expect(html).toContain('Shift Tone Style')
+    expect(html).not.toContain('Tone Shifter Sliders')
+    expect(html).not.toContain('Shift Tone Style')
     expect(mocks.historyAdd).not.toHaveBeenCalled()
+  })
+
+  it('applies a selected Harper suggestion and relints the replacement text', async () => {
+    mocks.diagnose
+      .mockResolvedValueOnce({ status: 'ready', diagnostics: [localDiagnostic] })
+      .mockResolvedValue({ status: 'ready', diagnostics: [] })
+    render(<GrammarWorkspace />)
+    const editor = screen.getByLabelText('Local English grammar editor')
+
+    fireEvent.change(editor, { target: { value: localDiagnostic.sourceText } })
+    fireEvent.click(screen.getByRole('button', { name: 'Check English Grammar' }))
+    await screen.findByRole('button', { name: 'Apply suggestion: does not' })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
+
+    await waitFor(() => {
+      expect(editor).toHaveValue('It does not work.')
+    })
+    expect(localDiagnostic.suggestions[0].apply).toHaveBeenCalledWith('It dont work.')
+    expect(mocks.diagnose).toHaveBeenLastCalledWith('It does not work.')
+  })
+
+  it('defers local linting until IME composition ends', async () => {
+    vi.useFakeTimers()
+    const { unmount } = render(<GrammarWorkspace />)
+    const editor = screen.getByLabelText('Local English grammar editor')
+
+    fireEvent.compositionStart(editor)
+    fireEvent.change(editor, { target: { value: 'Composing text.' } })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOCAL_GRAMMAR_DEBOUNCE_MS)
+    })
+
+    expect(mocks.diagnose).not.toHaveBeenCalled()
+
+    fireEvent.compositionEnd(editor)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOCAL_GRAMMAR_DEBOUNCE_MS)
+    })
+
+    expect(mocks.diagnose).toHaveBeenCalledWith('Composing text.')
+    unmount()
+    vi.useRealTimers()
+  })
+
+  it('does not render a stale AI completion after changing grammar modes', async () => {
+    let complete: ((text: string) => Promise<void>) | undefined
+    mocks.runInference.mockImplementation(async (options: { onComplete: (text: string) => Promise<void> }) => {
+      complete = options.onComplete
+    })
+    render(<GrammarWorkspace />)
+
+    fireEvent.click(screen.getByRole('radio', { name: /AI Grammar Check/i }))
+    fireEvent.change(screen.getByPlaceholderText('Type or paste text content to rewrite...'), {
+      target: { value: 'Original draft.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Run AI Grammar Check' }))
+    fireEvent.click(screen.getByRole('radio', { name: /Local English grammar/i }))
+    const onComplete = complete
+    if (!onComplete) throw new Error('Expected the AI inference callback.')
+    await act(async () => {
+      await onComplete('Late AI rewrite.')
+    })
+
+    expect(screen.queryByText('Late AI rewrite.')).not.toBeInTheDocument()
   })
 })

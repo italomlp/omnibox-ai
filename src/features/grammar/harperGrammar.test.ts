@@ -7,7 +7,7 @@ import { createHarperGrammarService } from './harperGrammar'
 type MockLint = {
   message: () => string
   suggestions: () => { get_replacement_text: () => string }[]
-  span?: () => unknown
+  span: () => { start: number; end: number }
 }
 
 const createMockLinter = (lints: MockLint[] = []) => ({
@@ -18,23 +18,48 @@ const createMockLinter = (lints: MockLint[] = []) => ({
 })
 
 describe('Harper grammar service', () => {
-  it('maps local diagnostics and applies Harper suggestions to the full text', async () => {
+  it('maps Unicode-safe diagnostic ranges and applies Harper suggestions to matching text', async () => {
+    const suggestion = { get_replacement_text: () => 'does not' }
     const lint = {
       message: () => 'Use “does not” instead.',
-      suggestions: () => [{ get_replacement_text: () => 'does not' }],
+      suggestions: () => [suggestion],
+      span: () => ({ start: 5, end: 9 }),
     }
     const linter = createMockLinter([lint])
     const service = createHarperGrammarService(async () => linter as never)
 
-    const result = await service.diagnose('It dont work.')
+    const text = 'Hi 👋 dont work.'
+    const result = await service.diagnose(text)
 
     expect(result).toMatchObject({
       status: 'ready',
-      diagnostics: [{ message: 'Use “does not” instead.', suggestions: [{ replacement: 'does not' }] }],
+      diagnostics: [{
+        message: 'Use “does not” instead.',
+        range: { start: 6, end: 10 },
+        sourceText: text,
+        suggestions: [{ replacement: 'does not' }],
+      }],
     })
     if (result.status !== 'ready') throw new Error('Expected ready grammar result.')
-    await expect(result.diagnostics[0].suggestions[0].apply()).resolves.toBe('The corrected text.')
-    expect(linter.lint).toHaveBeenCalledWith('It dont work.', { language: 'plaintext', dedup: true })
+    await expect(result.diagnostics[0].suggestions[0].apply(text)).resolves.toBe('The corrected text.')
+    expect(linter.lint).toHaveBeenCalledWith(text, { language: 'plaintext', dedup: true })
+    expect(linter.applySuggestion).toHaveBeenCalledWith(text, lint, suggestion)
+  })
+
+  it('rejects suggestion application when the diagnostic source is stale', async () => {
+    const lint = {
+      message: () => 'Use a replacement.',
+      suggestions: () => [{ get_replacement_text: () => 'replacement' }],
+      span: () => ({ start: 0, end: 4 }),
+    }
+    const linter = createMockLinter([lint])
+    const service = createHarperGrammarService(async () => linter as never)
+
+    const result = await service.diagnose('Text.')
+
+    if (result.status !== 'ready') throw new Error('Expected ready grammar result.')
+    await expect(result.diagnostics[0].suggestions[0].apply('Changed text.')).resolves.toBeNull()
+    expect(linter.applySuggestion).not.toHaveBeenCalled()
   })
 
   it('returns stale when an earlier asynchronous lint completes after newer input', async () => {
@@ -106,18 +131,14 @@ describe('Harper grammar service', () => {
     expect(loadLinter).toHaveBeenCalledTimes(2)
   })
 
-  it('does not read Harper spans for non-BMP input', async () => {
-    const span = vi.fn(() => {
-      throw new Error('Span offsets must not be used for JavaScript text.')
-    })
+  it('suppresses diagnostics with invalid Harper scalar ranges', async () => {
     const linter = createMockLinter([{
       message: () => 'Use a replacement.',
       suggestions: () => [],
-      span,
+      span: () => ({ start: 0, end: 99 }),
     }])
     const service = createHarperGrammarService(async () => linter as never)
 
-    await expect(service.diagnose('Hello 👋 world.')).resolves.toMatchObject({ status: 'ready' })
-    expect(span).not.toHaveBeenCalled()
+    await expect(service.diagnose('Hello 👋 world.')).resolves.toEqual({ status: 'ready', diagnostics: [] })
   })
 })

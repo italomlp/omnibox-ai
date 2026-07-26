@@ -1,13 +1,17 @@
 import type { Lint, LintOptions, Suggestion, WorkerLinter } from 'harper.js'
 
+import { harperScalarRangeToUtf16Range, type Utf16Range } from './harperTextOffsets'
+
 export interface LocalGrammarSuggestion {
   replacement: string
-  apply: () => Promise<string>
+  apply: (currentText: string) => Promise<string | null>
 }
 
 export interface LocalGrammarDiagnostic {
   id: string
   message: string
+  range: Utf16Range
+  sourceText: string
   suggestions: LocalGrammarSuggestion[]
 }
 
@@ -42,14 +46,25 @@ const mapDiagnostic = (
   text: string,
   lint: Lint,
   linter: HarperLinter,
-): LocalGrammarDiagnostic => ({
-  id,
-  message: lint.message(),
-  suggestions: lint.suggestions().map((suggestion: Suggestion) => ({
-    replacement: suggestion.get_replacement_text(),
-    apply: () => linter.applySuggestion(text, lint, suggestion),
-  })),
-})
+): LocalGrammarDiagnostic | null => {
+  const range = harperScalarRangeToUtf16Range(text, lint.span())
+  if (!range) return null
+
+  return {
+    id,
+    message: lint.message(),
+    range,
+    sourceText: text,
+    suggestions: lint.suggestions().map((suggestion: Suggestion) => ({
+      replacement: suggestion.get_replacement_text(),
+      apply: async (currentText: string) => {
+        if (currentText !== text) return null
+
+        return linter.applySuggestion(currentText, lint, suggestion)
+      },
+    })),
+  }
+}
 
 export const createHarperGrammarService = (loadLinter: HarperLinterLoader = loadWorkerLinter) => {
   let linterPromise: Promise<HarperLinter> | undefined
@@ -89,7 +104,9 @@ export const createHarperGrammarService = (loadLinter: HarperLinterLoader = load
 
       return {
         status: 'ready',
-        diagnostics: lints.map((lint, index) => mapDiagnostic(`${currentRequestId}:${index}`, text, lint, linter)),
+        diagnostics: lints
+          .map((lint, index) => mapDiagnostic(`${currentRequestId}:${index}`, text, lint, linter))
+          .filter((diagnostic): diagnostic is LocalGrammarDiagnostic => diagnostic !== null),
       }
     } catch (error) {
       return currentRequestId === requestId

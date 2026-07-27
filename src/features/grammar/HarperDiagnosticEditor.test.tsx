@@ -68,7 +68,7 @@ describe('HarperDiagnosticEditor', () => {
     expect(onPaste).toHaveBeenCalledOnce()
   })
 
-  it('renders keyboard-reachable issue navigation and shows suggestion controls for an active issue', () => {
+  it('renders keyboard-reachable issue navigation and suggestion controls in its action group', () => {
     render(
       <HarperDiagnosticEditor
         value="It dont work."
@@ -81,7 +81,8 @@ describe('HarperDiagnosticEditor', () => {
     expect(screen.getByRole('button', { name: 'Select issue 1: Use “does not” instead.' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Select issue 1: Use “does not” instead.' }))
 
-    expect(screen.getByRole('button', { name: 'Apply suggestion: does not' })).toBeInTheDocument()
+    const actions = within(screen.getByRole('listitem')).getByRole('group', { name: 'Actions for issue 1' })
+    expect(within(actions).getByRole('button', { name: 'Apply suggestion: does not' })).toBeInTheDocument()
   })
 
   it('keeps the editor and issues panel in the responsive workspace contract while mirror marks remain decorative', () => {
@@ -124,7 +125,8 @@ describe('HarperDiagnosticEditor', () => {
     const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
     textarea.setSelectionRange(4, 4)
     fireEvent.select(textarea)
-    fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
+    const actions = screen.getByRole('group', { name: 'Actions for issue 1' })
+    fireEvent.click(within(actions).getByRole('button', { name: 'Apply suggestion: does not' }))
 
     expect(onApplySuggestion).toHaveBeenCalledWith(diagnostic, 0)
   })
@@ -141,7 +143,7 @@ describe('HarperDiagnosticEditor', () => {
     expect(within(issuesPanel).getByText(diagnostic.message).closest('li')).toHaveAttribute('aria-current', 'true')
   })
 
-  it('renders only the active issue in the anchored popover and applies its suggestion', () => {
+  it('renders an interactive active-issue popover and applies its suggestion', () => {
     const onApplySuggestion = vi.fn()
     render(
       <HarperDiagnosticEditor
@@ -155,12 +157,83 @@ describe('HarperDiagnosticEditor', () => {
 
     textarea.setSelectionRange(4, 4)
     fireEvent.select(textarea)
-    fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
-
     const popover = screen.getByLabelText('Active grammar issue')
     expect(popover).toHaveTextContent(diagnostic.message)
-    expect(popover).not.toHaveAttribute('role', 'dialog')
+    expect(popover).toHaveAttribute('role', 'region')
+    fireEvent.click(within(popover).getByRole('button', { name: 'Apply suggestion: does not' }))
     expect(onApplySuggestion).toHaveBeenCalledWith(diagnostic, 0)
+  })
+
+  it('applies the same suggestion callback from card and active-popover controls', () => {
+    const onApplySuggestion = vi.fn()
+    render(
+      <HarperDiagnosticEditor
+        value="It dont work."
+        diagnostics={[diagnostic]}
+        onChange={vi.fn()}
+        onApplySuggestion={onApplySuggestion}
+      />,
+    )
+
+    const actions = screen.getByRole('group', { name: 'Actions for issue 1' })
+    fireEvent.click(within(actions).getByRole('button', { name: 'Apply suggestion: does not' }))
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+    fireEvent.click(within(screen.getByLabelText('Active grammar issue')).getByRole('button', { name: 'Apply suggestion: does not' }))
+
+    expect(onApplySuggestion).toHaveBeenNthCalledWith(1, diagnostic, 0)
+    expect(onApplySuggestion).toHaveBeenNthCalledWith(2, diagnostic, 0)
+  })
+
+  it('renders card suggestion controls for non-active issues', () => {
+    const secondDiagnostic: LocalGrammarDiagnostic = {
+      ...diagnostic,
+      id: 'diagnostic-2',
+      message: 'Use “will not” instead.',
+      range: { start: 8, end: 12 },
+      sourceText: 'It dont wont.',
+      suggestions: [{ replacement: 'will not', apply: vi.fn().mockResolvedValue('It dont will not.') }],
+    }
+    render(
+      <HarperDiagnosticEditor
+        value="It dont wont."
+        diagnostics={[{ ...diagnostic, sourceText: 'It dont wont.' }, secondDiagnostic]}
+        onChange={vi.fn()}
+        onApplySuggestion={vi.fn()}
+      />,
+    )
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+
+    const secondActions = screen.getByRole('group', { name: 'Actions for issue 2' })
+    expect(within(secondActions).getByRole('button', { name: 'Apply suggestion: will not' })).toBeInTheDocument()
+  })
+
+  it('dismisses an active popover on pointer-down outside the editor, popover, and issues panel', () => {
+    render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+    expect(screen.getByLabelText('Active grammar issue')).toBeInTheDocument()
+
+    fireEvent.pointerDown(document.body)
+
+    expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
+  })
+
+  it('keeps issue messages full-width above a separate wrapping actions group', () => {
+    render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+    const issue = screen.getByText(diagnostic.message).closest('li')
+    if (!issue) throw new Error('Expected issue list item.')
+
+    const actions = within(issue).getByRole('group', { name: 'Actions for issue 1' })
+    expect(actions).toHaveClass('harper-diagnostic-issue-actions', 'flex-wrap')
+    expect(issue.querySelector('.harper-diagnostic-issue-actions')?.previousElementSibling).toHaveTextContent(diagnostic.message)
   })
 
   it('keeps contextual issue details dismissed after Escape until a new selection activation', () => {

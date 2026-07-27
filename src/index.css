@@ -136,6 +136,8 @@ html {
   font-weight: 400;
   line-height: 1.25rem;
   letter-spacing: normal;
+  font-kerning: normal;
+  text-indent: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: normal;
@@ -149,6 +151,7 @@ html {
 }
 
 .harper-diagnostic-textarea {
+  padding: 1rem;
   color: transparent;
   caret-color: #e4e4e7;
   scrollbar-gutter: stable;
@@ -177,8 +180,8 @@ html {
   border-radius: 0.75rem;
   background: rgba(24, 24, 27, 0.96);
   box-shadow: 0 12px 28px -16px rgba(0, 0, 0, 0.9);
-  pointer-events: none;
-  user-select: none;
+  pointer-events: auto;
+  user-select: text;
 }
 
 /* One issue panel moves beside the editor only when space permits. */

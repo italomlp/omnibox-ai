@@ -56,6 +56,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
   const highlightContentRef = useRef<HTMLDivElement>(null)
   const activeMarkRef = useRef<HTMLElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
+  const issuesPanelRef = useRef<HTMLElement>(null)
   const issueRefs = useRef(new Map<string, HTMLLIElement>())
   const [announcement, setAnnouncement] = useState('')
   const [activeDiagnosticKey, setActiveDiagnosticKey] = useState<string>()
@@ -87,6 +88,28 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
   useEffect(() => {
     if (!activeDiagnosticKey) return
     issueRefs.current.get(activeDiagnosticKey)?.scrollIntoView?.({ block: 'nearest' })
+  }, [activeDiagnosticKey])
+
+  useEffect(() => {
+    if (!activeDiagnosticKey) return
+
+    const dismissOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+
+      if (
+        editorRef.current?.contains(target)
+        || popoverRef.current?.contains(target)
+        || issuesPanelRef.current?.contains(target)
+      ) return
+
+      setActiveDiagnosticKey(undefined)
+      setDiagnosticToRevealKey(undefined)
+      setAnnouncement('Grammar issue details dismissed.')
+    }
+
+    document.addEventListener('pointerdown', dismissOnOutsidePointerDown)
+    return () => document.removeEventListener('pointerdown', dismissOnOutsidePointerDown)
   }, [activeDiagnosticKey])
 
   const updatePopoverPosition = useCallback(() => {
@@ -254,9 +277,8 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
         {activeDiagnostic && (
           <div
             ref={popoverRef}
-            role="status"
+            role="region"
             aria-label="Active grammar issue"
-            aria-live="polite"
             data-placement={popoverPosition?.placement ?? 'fallback'}
             className="harper-diagnostic-popover layer-popover40"
             style={{
@@ -266,9 +288,18 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
           >
             <p className="text-xs leading-relaxed text-zinc-100">{activeDiagnostic.message}</p>
             {activeDiagnostic.suggestions.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2 text-xs text-emerald-300">
-                {activeDiagnostic.suggestions.map((suggestion) => (
-                  <span key={`${activeDiagnostic.id}:${suggestion.replacement}`}>Suggestion: “{suggestion.replacement}”</span>
+              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Suggestions">
+                {activeDiagnostic.suggestions.map((suggestion, suggestionIndex) => (
+                  <button
+                    key={`${activeDiagnostic.id}:${suggestion.replacement}:${suggestionIndex}`}
+                    type="button"
+                    onClick={() => onApplySuggestion?.(activeDiagnostic, suggestionIndex)}
+                    disabled={!onApplySuggestion}
+                    className="button-secondary control-compact text-xs text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={`Apply suggestion: ${suggestion.replacement}`}
+                  >
+                    Apply “{suggestion.replacement}”
+                  </button>
                 ))}
               </div>
             )}
@@ -280,7 +311,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
         {announcement || diagnosticAnnouncement}
       </p>
 
-      <aside id={issueListId} className="harper-diagnostic-issues-panel" aria-label="Grammar issues">
+      <aside ref={issuesPanelRef} id={issueListId} className="harper-diagnostic-issues-panel" aria-label="Grammar issues">
         <div className="flex min-w-0 items-center justify-between gap-3 border-b border-zinc-800/70 pb-3">
           <div className="min-w-0">
             <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Issues</h4>
@@ -322,12 +353,13 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
                   className={`rounded-lg border bg-zinc-950/30 p-3 ${isActive ? 'border-emerald-400 ring-1 ring-emerald-400/70' : 'border-zinc-800'}`}
                   aria-current={isActive ? 'true' : undefined}
                 >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1">
+                  <div className="min-w-0 space-y-2">
+                    <div className="min-w-0 space-y-1">
                       <p className="text-xs leading-relaxed text-zinc-200">{diagnostic.message}</p>
                       {isActive && <p className="text-xs font-medium text-emerald-300">Active issue</p>}
                     </div>
-                    <button
+                    <div className="harper-diagnostic-issue-actions flex flex-wrap items-center gap-2 border-t border-zinc-800/70 pt-2" role="group" aria-label={`Actions for issue ${index + 1}`}>
+                     <button
                       type="button"
                       onClick={() => focusDiagnostic(diagnostic, index)}
                       className="button-secondary control-standard shrink-0 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
@@ -335,7 +367,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
                     >
                       Select issue
                     </button>
-                    {isActive && diagnostic.suggestions.map((suggestion, suggestionIndex) => (
+                    {diagnostic.suggestions.map((suggestion, suggestionIndex) => (
                       <button
                         key={`${diagnostic.id}:${suggestion.replacement}:${suggestionIndex}`}
                         type="button"
@@ -347,6 +379,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
                         Apply “{suggestion.replacement}”
                       </button>
                     ))}
+                    </div>
                   </div>
                 </li>
               )

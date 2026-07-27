@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as ReactDOMServer from 'react-dom/server'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   diagnose: vi.fn(),
@@ -187,10 +187,9 @@ describe('GrammarWorkspace', () => {
       })
       expect(mocks.diagnose).toHaveBeenCalledWith(localDiagnostic.sourceText)
 
-      editor.setSelectionRange(4, 4)
-      fireEvent.select(editor)
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
+        const actions = screen.getByRole('group', { name: 'Actions for issue 1' })
+        fireEvent.click(within(actions).getByRole('button', { name: 'Apply suggestion: does not' }))
         await vi.runAllTimersAsync()
       })
 

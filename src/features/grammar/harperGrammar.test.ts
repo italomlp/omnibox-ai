@@ -14,6 +14,9 @@ const createMockLinter = (lints: MockLint[] = []) => ({
   setup: vi.fn().mockResolvedValue(undefined),
   lint: vi.fn().mockResolvedValue(lints),
   applySuggestion: vi.fn().mockResolvedValue('The corrected text.'),
+  ignoreLint: vi.fn().mockResolvedValue(undefined),
+  exportIgnoredLints: vi.fn().mockResolvedValue('["context-hash"]'),
+  importIgnoredLints: vi.fn().mockResolvedValue(undefined),
   dispose: vi.fn().mockResolvedValue(undefined),
 })
 
@@ -60,6 +63,61 @@ describe('Harper grammar service', () => {
     if (result.status !== 'ready') throw new Error('Expected ready grammar result.')
     await expect(result.diagnostics[0].suggestions[0].apply('Changed text.')).resolves.toBeNull()
     expect(linter.applySuggestion).not.toHaveBeenCalled()
+  })
+
+  it('ignores only the selected lint context and persists Harper exported hashes', async () => {
+    const firstLint = {
+      message: () => 'First issue.',
+      suggestions: () => [],
+      span: () => ({ start: 0, end: 4 }),
+    }
+    const secondLint = {
+      message: () => 'Second issue.',
+      suggestions: () => [],
+      span: () => ({ start: 5, end: 9 }),
+    }
+    const linter = createMockLinter([firstLint, secondLint])
+    const storage = { getItem: vi.fn().mockReturnValue(null), setItem: vi.fn() }
+    const service = createHarperGrammarService(async () => linter as never, storage)
+    const result = await service.diagnose('First text.')
+
+    if (result.status !== 'ready') throw new Error('Expected ready grammar result.')
+    await expect(service.ignoreDiagnostic(result.diagnostics[0], 'First text.')).resolves.toBe(true)
+
+    expect(linter.ignoreLint).toHaveBeenCalledWith('First text.', firstLint)
+    expect(linter.ignoreLint).not.toHaveBeenCalledWith('First text.', secondLint)
+    expect(storage.setItem).toHaveBeenCalledWith('omnibox-harper-ignored-lints-v1', '["context-hash"]')
+  })
+
+  it('hydrates valid ignored context hashes before linting', async () => {
+    const linter = createMockLinter()
+    const storage = { getItem: vi.fn().mockReturnValue('["context-hash"]'), setItem: vi.fn() }
+    const service = createHarperGrammarService(async () => linter as never, storage)
+
+    await service.diagnose('Text.')
+
+    expect(linter.importIgnoredLints).toHaveBeenCalledWith('["context-hash"]')
+    expect(linter.importIgnoredLints).toHaveBeenCalledBefore(linter.lint)
+  })
+
+  it('continues local linting when persisted ignored hashes are malformed or incompatible', async () => {
+    const linter = createMockLinter()
+    linter.importIgnoredLints.mockRejectedValue(new Error('Unsupported hash format.'))
+    const storage = { getItem: vi.fn().mockReturnValue('[]'), setItem: vi.fn() }
+    const service = createHarperGrammarService(async () => linter as never, storage)
+
+    await expect(service.diagnose('Text.')).resolves.toMatchObject({ status: 'ready' })
+    expect(linter.lint).toHaveBeenCalledWith('Text.', { language: 'plaintext', dedup: true })
+  })
+
+  it('skips malformed persisted data without preventing local linting', async () => {
+    const linter = createMockLinter()
+    const storage = { getItem: vi.fn().mockReturnValue('{not valid JSON'), setItem: vi.fn() }
+    const service = createHarperGrammarService(async () => linter as never, storage)
+
+    await expect(service.diagnose('Text.')).resolves.toMatchObject({ status: 'ready' })
+    expect(linter.importIgnoredLints).not.toHaveBeenCalled()
+    expect(linter.lint).toHaveBeenCalledWith('Text.', { language: 'plaintext', dedup: true })
   })
 
   it('returns stale when an earlier asynchronous lint completes after newer input', async () => {

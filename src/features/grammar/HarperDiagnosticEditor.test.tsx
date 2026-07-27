@@ -133,6 +133,29 @@ describe('HarperDiagnosticEditor', () => {
     expect(onApplySuggestion).toHaveBeenCalledWith(diagnostic, 0)
   })
 
+  it('exposes Ignore controls in both issue-card and active-popover surfaces', () => {
+    const onIgnoreDiagnostic = vi.fn()
+    const ignorableDiagnostic = { ...diagnostic, ignore: vi.fn().mockResolvedValue(true) }
+    render(
+      <HarperDiagnosticEditor
+        value="It dont work."
+        diagnostics={[ignorableDiagnostic]}
+        onChange={vi.fn()}
+        onIgnoreDiagnostic={onIgnoreDiagnostic}
+      />,
+    )
+
+    const cardActions = screen.getByRole('group', { name: 'Actions for issue 1' })
+    fireEvent.click(within(cardActions).getByRole('button', { name: 'Ignore' }))
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+    fireEvent.click(within(screen.getByRole('group', { name: 'Ignore active grammar issue' })).getByRole('button', { name: 'Ignore' }))
+
+    expect(onIgnoreDiagnostic).toHaveBeenNthCalledWith(1, ignorableDiagnostic)
+    expect(onIgnoreDiagnostic).toHaveBeenNthCalledWith(2, ignorableDiagnostic)
+  })
+
   it('activates the issue that contains the textarea caret and reveals its active state', () => {
     render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
     const textarea = screen.getByRole('textbox') as HTMLTextAreaElement

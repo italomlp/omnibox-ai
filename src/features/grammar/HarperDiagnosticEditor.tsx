@@ -16,6 +16,7 @@ export interface HarperDiagnosticEditorProps extends Omit<React.TextareaHTMLAttr
   diagnosticMessage?: string | null
   onChange: (value: string) => void
   onApplySuggestion?: (diagnostic: LocalGrammarDiagnostic, suggestionIndex: number) => void
+  onIgnoreDiagnostic?: (diagnostic: LocalGrammarDiagnostic) => void
   dismissPopoverSignal?: number
 }
 
@@ -42,6 +43,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
   diagnosticMessage,
   onChange,
   onApplySuggestion,
+  onIgnoreDiagnostic,
   dismissPopoverSignal,
   className,
   id,
@@ -300,6 +302,16 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
             }}
           >
             <p className="text-xs leading-relaxed text-zinc-100">{activeDiagnostic.message}</p>
+            <div className="mt-2" role="group" aria-label="Ignore active grammar issue">
+              <button
+                type="button"
+                onClick={() => onIgnoreDiagnostic?.(activeDiagnostic)}
+                disabled={!onIgnoreDiagnostic || !activeDiagnostic.ignore}
+                className="button-secondary control-compact text-xs text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Ignore
+              </button>
+            </div>
             {activeDiagnostic.suggestions.length > 0 && (
               <div className="mt-2" role="group" aria-label="Apply suggestions for active grammar issue">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Apply</p>
@@ -380,10 +392,18 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
                       onClick={() => focusDiagnostic(diagnostic, index)}
                       className="button-secondary control-standard shrink-0 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
                       aria-label={`Select issue ${index + 1}: ${diagnostic.message}`}
-                    >
-                      Select issue
-                    </button>
-                    {diagnostic.suggestions.length > 0 && (
+                     >
+                       Select issue
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => onIgnoreDiagnostic?.(diagnostic)}
+                       disabled={!onIgnoreDiagnostic || !diagnostic.ignore}
+                       className="button-secondary control-standard shrink-0 text-xs text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+                     >
+                       Ignore
+                     </button>
+                     {diagnostic.suggestions.length > 0 && (
                       <div role="group" aria-label={`Apply suggestions for issue ${index + 1}`}>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Apply</p>
                         <div className="mt-1 flex flex-wrap gap-2">

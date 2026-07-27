@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   diagnose: vi.fn(),
+  ignoreDiagnostic: vi.fn(),
   runInference: vi.fn(),
   historyAdd: vi.fn(),
 }))
@@ -24,7 +25,7 @@ vi.mock('../../hooks/useInference', () => ({
 }))
 
 vi.mock('./harperGrammar', () => ({
-  harperGrammar: { diagnose: mocks.diagnose },
+  harperGrammar: { diagnose: mocks.diagnose, ignoreDiagnostic: mocks.ignoreDiagnostic },
 }))
 
 vi.mock('../../db/db', () => ({
@@ -58,6 +59,7 @@ describe('GrammarWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.diagnose.mockResolvedValue({ status: 'ready', diagnostics: [] })
+    mocks.ignoreDiagnostic.mockResolvedValue(true)
   })
 
   it('renders the default private English grammar mode and Harper attribution without inference', () => {
@@ -196,6 +198,33 @@ describe('GrammarWorkspace', () => {
       expect(editor).toHaveValue('It does not work.')
       expect(mocks.diagnose).toHaveBeenLastCalledWith('It does not work.')
       expect(localDiagnostic.suggestions[0].apply).toHaveBeenCalledWith('It dont work.')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ignores a local issue and immediately relints without invoking inference', async () => {
+    vi.useFakeTimers()
+    try {
+      const ignore = vi.fn().mockResolvedValue(true)
+      mocks.diagnose
+        .mockResolvedValueOnce({ status: 'ready', diagnostics: [{ ...localDiagnostic, ignore }] })
+        .mockResolvedValue({ status: 'ready', diagnostics: [] })
+      render(<GrammarWorkspace />)
+      const editor = screen.getByLabelText('Local English grammar editor')
+
+      fireEvent.change(editor, { target: { value: localDiagnostic.sourceText } })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LOCAL_GRAMMAR_DEBOUNCE_MS)
+      })
+      fireEvent.click(within(screen.getByRole('group', { name: 'Actions for issue 1' })).getByRole('button', { name: 'Ignore' }))
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+
+      expect(mocks.diagnose).toHaveBeenLastCalledWith(localDiagnostic.sourceText)
+      expect(mocks.ignoreDiagnostic).toHaveBeenCalledWith(expect.objectContaining({ id: 'lint-1' }), localDiagnostic.sourceText)
+      expect(mocks.runInference).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }

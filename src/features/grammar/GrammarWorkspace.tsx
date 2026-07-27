@@ -244,6 +244,26 @@ export const GrammarWorkspace: React.FC = () => {
     }
   }
 
+  const handleIgnoreDiagnostic = async (diagnostic: LocalGrammarDiagnostic) => {
+    const ignoredInputRevision = inputRevision.current
+    if (!shouldApplyLocalSuggestion(diagnostic.sourceText, input, ignoredInputRevision, inputRevision.current)) return
+
+    try {
+      const ignored = await harperGrammar.ignoreDiagnostic(diagnostic, input)
+      if (!ignored || !shouldApplyLocalSuggestion(diagnostic.sourceText, input, ignoredInputRevision, inputRevision.current)) return
+
+      // Ignoring is local and context-specific; immediately refresh the visible issue list.
+      skipNextLocalDebounce.current = { text: input, revision: inputRevision.current }
+      void runLocalGrammarCheck(input, inputRevision.current)
+    } catch (error) {
+      if (ignoredInputRevision !== inputRevision.current) return
+
+      setLocalDiagnostics([])
+      setLocalGrammarStatus('unavailable')
+      setLocalGrammarMessage(error instanceof Error ? error.message : 'Unable to ignore this grammar issue.')
+    }
+  }
+
   const handleGrammarModeChange = (mode: GrammarMode) => {
     grammarModeRevision.current += 1
     localLintRequestId.current += 1
@@ -371,8 +391,9 @@ export const GrammarWorkspace: React.FC = () => {
               dismissPopoverSignal={popoverDismissSignal}
               onChange={handleInputChange}
               onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-              onApplySuggestion={(diagnostic, suggestionIndex) => void handleApplySuggestion(diagnostic, suggestionIndex)}
+               onCompositionEnd={handleCompositionEnd}
+               onApplySuggestion={(diagnostic, suggestionIndex) => void handleApplySuggestion(diagnostic, suggestionIndex)}
+               onIgnoreDiagnostic={(diagnostic) => void handleIgnoreDiagnostic(diagnostic)}
               placeholder="Type or paste text content to check locally..."
               aria-label="Local English grammar editor"
               className="max-h-[480px] text-zinc-200"

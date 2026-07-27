@@ -203,23 +203,8 @@ export const GrammarWorkspace: React.FC = () => {
     })
   }
 
-  const handleLocalGrammarCheck = () => {
-    if (isComposing) return
-
-    if (localLintTimeout.current) {
-      clearTimeout(localLintTimeout.current)
-      localLintTimeout.current = null
-    }
-    void runLocalGrammarCheck(input, inputRevision.current)
-  }
-
-  const handleFixGrammar = () => {
+  const handleAiGrammarCheck = () => {
     if (!input.trim()) return
-
-    if (grammarMode === 'local') {
-      void handleLocalGrammarCheck()
-      return
-    }
 
     void dispatchGrammarCheck('ai', input, harperGrammar.diagnose, () => executeInference('grammar', { text: input }))
   }
@@ -357,7 +342,7 @@ export const GrammarWorkspace: React.FC = () => {
       />
 
       {/* Workspace core layouts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className={`grid gap-6 ${grammarMode === 'ai' ? 'lg:grid-cols-2' : ''}`}>
         {/* Left Side: Input Frame */}
         <div className="surface-nested flex min-w-0 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4">
           <div className="flex min-w-0 items-center justify-between gap-2">
@@ -369,6 +354,8 @@ export const GrammarWorkspace: React.FC = () => {
             <HarperDiagnosticEditor
               value={input}
               diagnostics={localDiagnostics}
+              diagnosticStatus={localGrammarStatus}
+              diagnosticMessage={localGrammarMessage}
               onChange={handleInputChange}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
@@ -398,21 +385,24 @@ export const GrammarWorkspace: React.FC = () => {
             >
               <RotateCcw className="w-4 h-4" />
             </button>
-            
-            <button
-              type="button"
-              onClick={handleFixGrammar}
-               disabled={isProcessing || localGrammarStatus === 'checking' || !input.trim()}
-              className="button-primary control-touch flex-1 text-xs disabled:opacity-40 disabled:pointer-events-none"
-            >
-               {grammarMode === 'local' ? 'Check English Grammar' : 'Run AI Grammar Check'}
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+
+            {grammarMode === 'ai' && (
+              <button
+                type="button"
+                onClick={handleAiGrammarCheck}
+                disabled={isProcessing || !input.trim()}
+                className="button-primary control-touch flex-1 text-xs disabled:opacity-40 disabled:pointer-events-none"
+              >
+                Run AI Grammar Check
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-         {/* Right Side: AI Output Preview or local diagnostic list */}
-        <div className="surface-nested flex min-w-0 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4">
+        {grammarMode === 'ai' && (
+          /* Right Side: AI Output Preview */
+          <div className="surface-nested flex min-w-0 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4">
           <div className="flex min-w-0 items-center justify-between gap-2">
              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">{resultSource === 'local' ? 'Local Diagnostics' : 'Refactored Result'}</h3>
             {output && (
@@ -451,14 +441,15 @@ export const GrammarWorkspace: React.FC = () => {
                   No grammar issues found.
                 </div>
               ) : resultSource === 'local' ? (
-               <span className="text-zinc-600 italic">Run a local English grammar check to see diagnostics here.</span>
+                <span className="text-zinc-600 italic">Type or paste text to begin local grammar checking.</span>
              ) : output ? (
                <p className="whitespace-pre-wrap break-words">{output}</p>
             ) : (
               <span className="text-zinc-600 italic">Output results will stream here...</span>
             )}
           </div>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Tone Rewrite is an AI-only workflow. */}

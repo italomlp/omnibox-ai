@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as ReactDOMServer from 'react-dom/server'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   diagnose: vi.fn(),
@@ -124,7 +124,21 @@ describe('GrammarWorkspace', () => {
     const html = ReactDOMServer.renderToStaticMarkup(<GrammarWorkspace />)
 
     expect(html).toContain('harper-diagnostic-editor')
-    expect(html).toContain('Local Diagnostics')
+    expect(html).toContain('Issues')
+    expect(html).not.toContain('Check English Grammar')
+    expect(html).toContain('Type or paste text to begin local grammar checking.')
+  })
+
+  it('omits a local manual action while retaining explicit AI grammar and tone actions', () => {
+    render(<GrammarWorkspace />)
+
+    expect(screen.queryByRole('button', { name: 'Run AI Grammar Check' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Check English Grammar' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('radio', { name: /AI Grammar Check/i }))
+
+    expect(screen.getByRole('button', { name: 'Run AI Grammar Check' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Shift Tone Style' })).toBeInTheDocument()
   })
 
   it('documents a short debounce for incremental local relinting', () => {
@@ -159,22 +173,33 @@ describe('GrammarWorkspace', () => {
   })
 
   it('applies a selected Harper suggestion and relints the replacement text', async () => {
-    mocks.diagnose
-      .mockResolvedValueOnce({ status: 'ready', diagnostics: [localDiagnostic] })
-      .mockResolvedValue({ status: 'ready', diagnostics: [] })
-    render(<GrammarWorkspace />)
-    const editor = screen.getByLabelText('Local English grammar editor')
+    vi.useFakeTimers()
+    try {
+      mocks.diagnose
+        .mockResolvedValueOnce({ status: 'ready', diagnostics: [localDiagnostic] })
+        .mockResolvedValue({ status: 'ready', diagnostics: [] })
+      render(<GrammarWorkspace />)
+      const editor = screen.getByLabelText('Local English grammar editor') as HTMLTextAreaElement
 
-    fireEvent.change(editor, { target: { value: localDiagnostic.sourceText } })
-    fireEvent.click(screen.getByRole('button', { name: 'Check English Grammar' }))
-    await screen.findByRole('button', { name: 'Apply suggestion: does not' })
-    fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
+      fireEvent.change(editor, { target: { value: localDiagnostic.sourceText } })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LOCAL_GRAMMAR_DEBOUNCE_MS)
+      })
+      expect(mocks.diagnose).toHaveBeenCalledWith(localDiagnostic.sourceText)
 
-    await waitFor(() => {
+      editor.setSelectionRange(4, 4)
+      fireEvent.select(editor)
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
+        await vi.runAllTimersAsync()
+      })
+
       expect(editor).toHaveValue('It does not work.')
-    })
-    expect(localDiagnostic.suggestions[0].apply).toHaveBeenCalledWith('It dont work.')
-    expect(mocks.diagnose).toHaveBeenLastCalledWith('It does not work.')
+      expect(mocks.diagnose).toHaveBeenLastCalledWith('It does not work.')
+      expect(localDiagnostic.suggestions[0].apply).toHaveBeenCalledWith('It dont work.')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('defers local linting until IME composition ends', async () => {

@@ -56,7 +56,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
   useEffect(() => {
     if (activeIndex < 0) return
 
-    itemRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' })
+    itemRefs.current[activeIndex]?.scrollIntoView?.({ block: 'nearest' })
   }, [activeIndex])
 
   const handleSelect = (item: CommandPaletteItem) => {

@@ -154,7 +154,7 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
     if (!isOpen) return;
 
     const option = optionRefs.current[activeIndex];
-    option?.scrollIntoView({ block: 'nearest' });
+    option?.scrollIntoView?.({ block: 'nearest' });
   }, [activeIndex, isOpen]);
 
   useEffect(() => {

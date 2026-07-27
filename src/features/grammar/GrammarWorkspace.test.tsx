@@ -201,6 +201,29 @@ describe('GrammarWorkspace', () => {
     }
   })
 
+  it('dismisses the active popover from the broader Input Snippet surface without blocking its controls', async () => {
+    vi.useFakeTimers()
+    try {
+      mocks.diagnose.mockResolvedValue({ status: 'ready', diagnostics: [localDiagnostic] })
+      render(<GrammarWorkspace />)
+      const editor = screen.getByLabelText('Local English grammar editor') as HTMLTextAreaElement
+
+      fireEvent.change(editor, { target: { value: localDiagnostic.sourceText } })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LOCAL_GRAMMAR_DEBOUNCE_MS)
+      })
+      editor.setSelectionRange(4, 4)
+      fireEvent.select(editor)
+      expect(screen.getByLabelText('Active grammar issue')).toBeInTheDocument()
+
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Clear input' }))
+
+      expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('defers local linting until IME composition ends', async () => {
     vi.useFakeTimers()
     const { unmount } = render(<GrammarWorkspace />)

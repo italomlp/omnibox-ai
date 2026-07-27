@@ -16,6 +16,7 @@ export interface HarperDiagnosticEditorProps extends Omit<React.TextareaHTMLAttr
   diagnosticMessage?: string | null
   onChange: (value: string) => void
   onApplySuggestion?: (diagnostic: LocalGrammarDiagnostic, suggestionIndex: number) => void
+  dismissPopoverSignal?: number
 }
 
 const getDiagnosticKey = (diagnostic: LocalGrammarDiagnostic): string => {
@@ -41,6 +42,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
   diagnosticMessage,
   onChange,
   onApplySuggestion,
+  dismissPopoverSignal,
   className,
   id,
   onScroll,
@@ -58,6 +60,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
   const popoverRef = useRef<HTMLDivElement>(null)
   const issuesPanelRef = useRef<HTMLElement>(null)
   const issueRefs = useRef(new Map<string, HTMLLIElement>())
+  const lastDismissPopoverSignal = useRef(dismissPopoverSignal)
   const [announcement, setAnnouncement] = useState('')
   const [activeDiagnosticKey, setActiveDiagnosticKey] = useState<string>()
   const [diagnosticToRevealKey, setDiagnosticToRevealKey] = useState<string>()
@@ -84,6 +87,16 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
       setAnnouncement('The selected grammar issue is no longer current.')
     }
   }, [activeDiagnostic, activeDiagnosticKey])
+
+  useEffect(() => {
+    if (dismissPopoverSignal === lastDismissPopoverSignal.current) return
+    lastDismissPopoverSignal.current = dismissPopoverSignal
+    if (dismissPopoverSignal === undefined || !activeDiagnosticKey) return
+
+    setActiveDiagnosticKey(undefined)
+    setDiagnosticToRevealKey(undefined)
+    setAnnouncement('Grammar issue details dismissed.')
+  }, [activeDiagnosticKey, dismissPopoverSignal])
 
   useEffect(() => {
     if (!activeDiagnosticKey) return
@@ -219,7 +232,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
 
   return (
     <section className="harper-diagnostic-workspace" aria-label="Local grammar editor">
-      <div ref={editorRef} className="harper-diagnostic-editor relative min-h-[220px] min-w-0 w-full overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-950/60">
+      <div ref={editorRef} className="harper-diagnostic-editor relative min-h-[280px] min-w-0 w-full overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-950/60">
         <div className="harper-diagnostic-highlight-layer" aria-hidden="true">
           <div ref={highlightContentRef} className="harper-diagnostic-highlight-content">
             {segments.map((segment, index) => segment.diagnostic ? (
@@ -272,7 +285,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
             onScroll?.(event)
           }}
           aria-describedby={`${statusId} ${issueListId}`}
-          className={`harper-diagnostic-textarea glass-input control-touch relative z-10 min-h-[220px] w-full resize-y rounded-lg border-0 bg-transparent p-4 text-sm ${className ?? ''}`}
+          className={`harper-diagnostic-textarea glass-input control-touch relative z-10 min-h-[280px] w-full resize-y rounded-lg border-0 bg-transparent p-4 text-sm ${className ?? ''}`}
         />
         {activeDiagnostic && (
           <div
@@ -288,7 +301,9 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
           >
             <p className="text-xs leading-relaxed text-zinc-100">{activeDiagnostic.message}</p>
             {activeDiagnostic.suggestions.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Suggestions">
+              <div className="mt-2" role="group" aria-label="Apply suggestions for active grammar issue">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Apply</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {activeDiagnostic.suggestions.map((suggestion, suggestionIndex) => (
                   <button
                     key={`${activeDiagnostic.id}:${suggestion.replacement}:${suggestionIndex}`}
@@ -298,9 +313,10 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
                     className="button-secondary control-compact text-xs text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label={`Apply suggestion: ${suggestion.replacement}`}
                   >
-                    Apply “{suggestion.replacement}”
+                    {suggestion.replacement}
                   </button>
                 ))}
+                </div>
               </div>
             )}
           </div>
@@ -367,18 +383,25 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
                     >
                       Select issue
                     </button>
-                    {diagnostic.suggestions.map((suggestion, suggestionIndex) => (
-                      <button
-                        key={`${diagnostic.id}:${suggestion.replacement}:${suggestionIndex}`}
-                        type="button"
-                        onClick={() => onApplySuggestion?.(diagnostic, suggestionIndex)}
-                        disabled={!onApplySuggestion}
-                        className="button-secondary control-standard shrink-0 text-xs text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label={`Apply suggestion: ${suggestion.replacement}`}
-                      >
-                        Apply “{suggestion.replacement}”
-                      </button>
-                    ))}
+                    {diagnostic.suggestions.length > 0 && (
+                      <div role="group" aria-label={`Apply suggestions for issue ${index + 1}`}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Apply</p>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {diagnostic.suggestions.map((suggestion, suggestionIndex) => (
+                            <button
+                              key={`${diagnostic.id}:${suggestion.replacement}:${suggestionIndex}`}
+                              type="button"
+                              onClick={() => onApplySuggestion?.(diagnostic, suggestionIndex)}
+                              disabled={!onApplySuggestion}
+                              className="button-secondary control-standard shrink-0 text-xs text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label={`Apply suggestion: ${suggestion.replacement}`}
+                            >
+                              {suggestion.replacement}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     </div>
                   </div>
                 </li>

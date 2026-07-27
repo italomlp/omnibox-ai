@@ -56,6 +56,7 @@ export const GrammarWorkspace: React.FC = () => {
   const [localGrammarStatus, setLocalGrammarStatus] = useState<'idle' | 'checking' | 'ready' | 'unavailable'>('idle')
   const [localGrammarMessage, setLocalGrammarMessage] = useState<string | null>(null)
   const [isComposing, setIsComposing] = useState(false)
+  const [popoverDismissSignal, setPopoverDismissSignal] = useState(0)
   const inputRevision = React.useRef(0)
   const grammarModeRevision = React.useRef(0)
   const localLintRequestId = React.useRef(0)
@@ -109,6 +110,14 @@ export const GrammarWorkspace: React.FC = () => {
     setLocalDiagnostics([])
     setLocalGrammarStatus('idle')
     setLocalGrammarMessage(null)
+  }
+
+  const handleInputSnippetPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (!(target instanceof Element)) return
+
+    if (target.closest('.harper-diagnostic-editor, .harper-diagnostic-issues-panel')) return
+    setPopoverDismissSignal((signal) => signal + 1)
   }
 
   const handleCompositionStart = () => {
@@ -344,7 +353,10 @@ export const GrammarWorkspace: React.FC = () => {
       {/* Workspace core layouts */}
       <div className={`grid gap-6 ${grammarMode === 'ai' ? 'lg:grid-cols-2' : ''}`}>
         {/* Left Side: Input Frame */}
-        <div className="surface-nested flex min-w-0 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4">
+        <div
+          className="surface-nested flex min-w-0 flex-col space-y-3 rounded-xl border border-zinc-800/40 p-4"
+          onPointerDown={grammarMode === 'local' ? handleInputSnippetPointerDown : undefined}
+        >
           <div className="flex min-w-0 items-center justify-between gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Input Snippet</h3>
             <span className="text-[10px] text-zinc-500">{input.length} characters</span>
@@ -356,13 +368,14 @@ export const GrammarWorkspace: React.FC = () => {
               diagnostics={localDiagnostics}
               diagnosticStatus={localGrammarStatus}
               diagnosticMessage={localGrammarMessage}
+              dismissPopoverSignal={popoverDismissSignal}
               onChange={handleInputChange}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
               onApplySuggestion={(diagnostic, suggestionIndex) => void handleApplySuggestion(diagnostic, suggestionIndex)}
               placeholder="Type or paste text content to check locally..."
               aria-label="Local English grammar editor"
-              className="max-h-[400px] text-zinc-200"
+              className="max-h-[480px] text-zinc-200"
             />
           ) : (
             <textarea

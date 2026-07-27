@@ -116,11 +116,9 @@ html {
 .harper-diagnostic-highlight-layer {
   position: absolute;
   inset: 0;
-  overflow: scroll;
+  overflow: hidden;
   pointer-events: none;
   color: #d4d4d8;
-  scrollbar-gutter: stable;
-  scrollbar-width: none;
 }
 
 .harper-diagnostic-highlight-layer::-webkit-scrollbar {
@@ -137,7 +135,13 @@ html {
   line-height: 1.25rem;
   letter-spacing: normal;
   font-kerning: normal;
+  font-variant-ligatures: none;
+  font-feature-settings: normal;
   text-indent: 0;
+  text-align: start;
+  text-transform: none;
+  direction: inherit;
+  unicode-bidi: plaintext;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: normal;
@@ -148,6 +152,7 @@ html {
   min-height: 100%;
   padding: 1rem;
   will-change: transform;
+  overflow: visible;
 }
 
 .harper-diagnostic-textarea {

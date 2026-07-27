@@ -68,7 +68,7 @@ describe('HarperDiagnosticEditor', () => {
     expect(onPaste).toHaveBeenCalledOnce()
   })
 
-  it('renders keyboard-reachable issue navigation and suggestion controls in its action group', () => {
+  it('renders keyboard-reachable issue navigation and concise suggestion chips in scoped action groups', () => {
     render(
       <HarperDiagnosticEditor
         value="It dont work."
@@ -82,7 +82,9 @@ describe('HarperDiagnosticEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select issue 1: Use “does not” instead.' }))
 
     const actions = within(screen.getByRole('listitem')).getByRole('group', { name: 'Actions for issue 1' })
-    expect(within(actions).getByRole('button', { name: 'Apply suggestion: does not' })).toBeInTheDocument()
+    const suggestions = within(actions).getByRole('group', { name: 'Apply suggestions for issue 1' })
+    expect(within(suggestions).getByText('Apply')).toBeInTheDocument()
+    expect(within(suggestions).getByRole('button', { name: 'Apply suggestion: does not' })).toHaveTextContent('does not')
   })
 
   it('keeps the editor and issues panel in the responsive workspace contract while mirror marks remain decorative', () => {
@@ -160,7 +162,9 @@ describe('HarperDiagnosticEditor', () => {
     const popover = screen.getByLabelText('Active grammar issue')
     expect(popover).toHaveTextContent(diagnostic.message)
     expect(popover).toHaveAttribute('role', 'region')
-    fireEvent.click(within(popover).getByRole('button', { name: 'Apply suggestion: does not' }))
+    const suggestions = within(popover).getByRole('group', { name: 'Apply suggestions for active grammar issue' })
+    expect(within(suggestions).getByText('Apply')).toBeInTheDocument()
+    fireEvent.click(within(suggestions).getByRole('button', { name: 'Apply suggestion: does not' }))
     expect(onApplySuggestion).toHaveBeenCalledWith(diagnostic, 0)
   })
 
@@ -222,6 +226,17 @@ describe('HarperDiagnosticEditor', () => {
     expect(screen.getByLabelText('Active grammar issue')).toBeInTheDocument()
 
     fireEvent.pointerDown(document.body)
+
+    expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
+  })
+
+  it('dismisses an active popover when the enclosing Input Snippet signals a surface interaction', () => {
+    const { rerender } = render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} dismissPopoverSignal={0} />)
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+    rerender(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} dismissPopoverSignal={1} />)
 
     expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
   })

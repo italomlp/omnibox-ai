@@ -133,7 +133,7 @@ describe('HarperDiagnosticEditor', () => {
     expect(onApplySuggestion).toHaveBeenCalledWith(diagnostic, 0)
   })
 
-  it('exposes Ignore controls in both issue-card and active-popover surfaces', () => {
+  it('keeps Ignore in the issue-card primary actions and not the active popover', () => {
     const onIgnoreDiagnostic = vi.fn()
     const ignorableDiagnostic = { ...diagnostic, ignore: vi.fn().mockResolvedValue(true) }
     render(
@@ -146,14 +146,15 @@ describe('HarperDiagnosticEditor', () => {
     )
 
     const cardActions = screen.getByRole('group', { name: 'Actions for issue 1' })
-    fireEvent.click(within(cardActions).getByRole('button', { name: 'Ignore' }))
+    const primaryActions = within(cardActions).getByRole('group', { name: 'Issue 1 primary actions' })
+    fireEvent.click(within(primaryActions).getByRole('button', { name: 'Ignore' }))
     const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
     textarea.setSelectionRange(4, 4)
     fireEvent.select(textarea)
-    fireEvent.click(within(screen.getByRole('group', { name: 'Ignore active grammar issue' })).getByRole('button', { name: 'Ignore' }))
 
-    expect(onIgnoreDiagnostic).toHaveBeenNthCalledWith(1, ignorableDiagnostic)
-    expect(onIgnoreDiagnostic).toHaveBeenNthCalledWith(2, ignorableDiagnostic)
+    expect(onIgnoreDiagnostic).toHaveBeenCalledOnce()
+    expect(onIgnoreDiagnostic).toHaveBeenCalledWith(ignorableDiagnostic)
+    expect(within(screen.getByLabelText('Active grammar issue')).queryByRole('button', { name: 'Ignore' })).not.toBeInTheDocument()
   })
 
   it('activates the issue that contains the textarea caret and reveals its active state', () => {
@@ -264,14 +265,18 @@ describe('HarperDiagnosticEditor', () => {
     expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
   })
 
-  it('keeps issue messages full-width above a separate wrapping actions group', () => {
+  it('keeps issue messages full-width above separate primary and suggestion action rows', () => {
     render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
     const issue = screen.getByText(diagnostic.message).closest('li')
     if (!issue) throw new Error('Expected issue list item.')
 
     const actions = within(issue).getByRole('group', { name: 'Actions for issue 1' })
-    expect(actions).toHaveClass('harper-diagnostic-issue-actions', 'flex-wrap')
+    expect(actions).toHaveClass('harper-diagnostic-issue-actions', 'space-y-2')
     expect(issue.querySelector('.harper-diagnostic-issue-actions')?.previousElementSibling).toHaveTextContent(diagnostic.message)
+    expect(within(actions).getByRole('group', { name: 'Issue 1 primary actions' })).toContainElement(
+      within(actions).getByRole('button', { name: 'Ignore' }),
+    )
+    expect(within(actions).getByRole('group', { name: 'Apply suggestions for issue 1' })).toHaveTextContent('Apply')
   })
 
   it('keeps contextual issue details dismissed after Escape until a new selection activation', () => {

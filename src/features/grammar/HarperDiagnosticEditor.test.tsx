@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as ReactDOMServer from 'react-dom/server'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 import { HarperDiagnosticEditor } from './HarperDiagnosticEditor'
 import { buildDiagnosticSegments } from './harperDiagnosticSegments'
+import { getDiagnosticPopoverPosition, getTextareaRangePosition } from './harperDiagnosticPositioning'
 import type { LocalGrammarDiagnostic } from './harperGrammar'
 
 const diagnostic: LocalGrammarDiagnostic = {
@@ -13,6 +14,15 @@ const diagnostic: LocalGrammarDiagnostic = {
   sourceText: 'It dont work.',
   suggestions: [{ replacement: 'does not', apply: vi.fn().mockResolvedValue('It does not work.') }],
 }
+
+const createRect = (left: number, top: number, width: number, height: number): DOMRect => ({
+  left,
+  top,
+  width,
+  height,
+  right: left + width,
+  bottom: top + height,
+} as DOMRect)
 
 describe('HarperDiagnosticEditor', () => {
   it('renders a controlled native textarea and an aria-hidden diagnostic overlay', () => {
@@ -58,8 +68,8 @@ describe('HarperDiagnosticEditor', () => {
     expect(onPaste).toHaveBeenCalledOnce()
   })
 
-  it('renders keyboard-reachable issue navigation and text-labelled suggestion controls', () => {
-    const html = ReactDOMServer.renderToStaticMarkup(
+  it('renders keyboard-reachable issue navigation and shows suggestion controls for an active issue', () => {
+    render(
       <HarperDiagnosticEditor
         value="It dont work."
         diagnostics={[diagnostic]}
@@ -68,9 +78,21 @@ describe('HarperDiagnosticEditor', () => {
       />,
     )
 
-    expect(html).toContain('Select issue')
-    expect(html).toContain('aria-label="Select issue 1: Use “does not” instead."')
-    expect(html).toContain('aria-label="Apply suggestion: does not"')
+    expect(screen.getByRole('button', { name: 'Select issue 1: Use “does not” instead.' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Select issue 1: Use “does not” instead.' }))
+
+    expect(screen.getByRole('button', { name: 'Apply suggestion: does not' })).toBeInTheDocument()
+  })
+
+  it('keeps the editor and issues panel in the responsive workspace contract while mirror marks remain decorative', () => {
+    const html = ReactDOMServer.renderToStaticMarkup(
+      <HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />,
+    )
+
+    expect(html).toContain('class="harper-diagnostic-workspace"')
+    expect(html).toContain('class="harper-diagnostic-issues-panel"')
+    expect(html).toContain('<div class="harper-diagnostic-highlight-layer" aria-hidden="true">')
+    expect(html).not.toContain('role="button"')
   })
 
   it('synchronizes the highlight layer to native textarea scrolling', () => {
@@ -99,9 +121,219 @@ describe('HarperDiagnosticEditor', () => {
       />,
     )
 
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
     fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
 
     expect(onApplySuggestion).toHaveBeenCalledWith(diagnostic, 0)
+  })
+
+  it('activates the issue that contains the textarea caret and reveals its active state', () => {
+    render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+
+    expect(screen.getByText('Active issue')).toBeInTheDocument()
+    const issuesPanel = screen.getByLabelText('Grammar issues')
+    expect(within(issuesPanel).getByText(diagnostic.message).closest('li')).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('renders only the active issue in the anchored popover and applies its suggestion', () => {
+    const onApplySuggestion = vi.fn()
+    render(
+      <HarperDiagnosticEditor
+        value="It dont work."
+        diagnostics={[diagnostic]}
+        onChange={vi.fn()}
+        onApplySuggestion={onApplySuggestion}
+      />,
+    )
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+    fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion: does not' }))
+
+    const popover = screen.getByLabelText('Active grammar issue')
+    expect(popover).toHaveTextContent(diagnostic.message)
+    expect(popover).not.toHaveAttribute('role', 'dialog')
+    expect(onApplySuggestion).toHaveBeenCalledWith(diagnostic, 0)
+  })
+
+  it('keeps contextual issue details dismissed after Escape until a new selection activation', () => {
+    const { rerender } = render(
+      <HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />,
+    )
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+
+    textarea.focus()
+    textarea.setSelectionRange(3, 7)
+    fireEvent.select(textarea)
+    fireEvent.keyDown(textarea, { key: 'Escape' })
+
+    expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(textarea)
+    expect(textarea.selectionStart).toBe(7)
+    expect(textarea.selectionEnd).toBe(7)
+
+    rerender(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+
+    expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
+
+    textarea.setSelectionRange(4, 4)
+    fireEvent.keyUp(textarea, { key: 'ArrowRight' })
+    fireEvent.select(textarea)
+
+    expect(screen.getByLabelText('Active grammar issue')).toBeInTheDocument()
+  })
+
+  it('uses a bounded top-start fallback when the visual range has no rectangle', () => {
+    const position = getDiagnosticPopoverPosition(
+      undefined,
+      createRect(100, 100, 300, 220),
+      createRect(0, 0, 180, 80),
+    )
+
+    expect(position).toEqual({ left: 8, top: 8, placement: 'fallback' })
+  })
+
+  it('places the popover above its range when below would leave the editor viewport', () => {
+    const position = getDiagnosticPopoverPosition(
+      createRect(140, 260, 40, 20),
+      createRect(100, 100, 300, 220),
+      createRect(0, 0, 180, 80),
+    )
+
+    expect(position).toEqual({ left: 40, top: 72, placement: 'above' })
+  })
+
+  it('refreshes the active popover position when the window layout changes', () => {
+    let markTop = 140
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('harper-diagnostic-mark')) return createRect(140, markTop, 40, 20)
+      if (this.classList.contains('harper-diagnostic-editor')) return createRect(100, 100, 300, 220)
+      if (this.classList.contains('harper-diagnostic-popover')) return createRect(0, 0, 120, 60)
+      return createRect(0, 0, 0, 0)
+    })
+    try {
+      render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+      const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+
+      textarea.setSelectionRange(4, 4)
+      fireEvent.select(textarea)
+      const popover = screen.getByLabelText('Active grammar issue')
+      markTop = 260
+      fireEvent.resize(window)
+
+      expect(popover).toHaveStyle({ left: '40px', top: '92px' })
+    } finally {
+      getBoundingClientRect.mockRestore()
+    }
+  })
+
+  it('refreshes the active popover position when the visual viewport changes', () => {
+    let visualViewportOffset = 0
+    const visualViewportDescriptor = Object.getOwnPropertyDescriptor(window, 'visualViewport')
+    const visualViewport = new EventTarget()
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('harper-diagnostic-mark')) return createRect(140, 140 + visualViewportOffset, 40, 20)
+      if (this.classList.contains('harper-diagnostic-editor')) return createRect(100, 100 + visualViewportOffset, 300, 220)
+      if (this.classList.contains('harper-diagnostic-popover')) return createRect(0, 0, 120, 60)
+      return createRect(0, 0, 0, 0)
+    })
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
+    try {
+      render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+      const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+
+      textarea.setSelectionRange(4, 4)
+      fireEvent.select(textarea)
+      const popover = screen.getByLabelText('Active grammar issue')
+      visualViewportOffset = 120
+      visualViewport.dispatchEvent(new Event('scroll'))
+
+      expect(popover).toHaveStyle({ left: '40px', top: '68px' })
+    } finally {
+      getBoundingClientRect.mockRestore()
+      if (visualViewportDescriptor) Object.defineProperty(window, 'visualViewport', visualViewportDescriptor)
+      else Reflect.deleteProperty(window, 'visualViewport')
+    }
+  })
+
+  it('calculates an internal textarea scroll position for a Unicode-safe off-screen range', () => {
+    const position = getTextareaRangePosition({
+      value: 'A😀B dont work.',
+      range: { start: 5, end: 9 },
+      textareaRect: createRect(100, 100, 300, 120),
+      rangeRect: createRect(120, 260, 40, 20),
+      scrollTop: 0,
+      scrollLeft: 0,
+      scrollHeight: 600,
+      scrollWidth: 300,
+      clientHeight: 120,
+      clientWidth: 300,
+      clientTop: 0,
+      clientLeft: 0,
+    })
+
+    expect(position).toEqual({ top: 60, left: 0 })
+  })
+
+  it('scrolls the textarea internally to reveal the selected side-panel range', () => {
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('harper-diagnostic-mark')) return createRect(120, 260, 40, 20)
+      if (this.classList.contains('harper-diagnostic-editor')) return createRect(100, 100, 300, 120)
+      return createRect(0, 0, 0, 0)
+    })
+    try {
+    render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    Object.defineProperties(textarea, {
+      clientHeight: { configurable: true, value: 120 },
+      clientWidth: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 600 },
+      scrollWidth: { configurable: true, value: 300 },
+    })
+    const issue = screen.getByText(diagnostic.message).closest('li')
+    if (!issue) throw new Error('Expected issue list item.')
+    const scrollActiveIssueIntoView = vi.fn()
+    issue.scrollIntoView = scrollActiveIssueIntoView
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select issue 1: Use “does not” instead.' }))
+
+    expect(document.activeElement).toBe(textarea)
+    expect(textarea.selectionStart).toBe(3)
+    expect(textarea.selectionEnd).toBe(7)
+    expect(textarea.scrollTop).toBe(160)
+    expect(scrollActiveIssueIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(screen.getByText('Active issue')).toBeInTheDocument()
+    } finally {
+      getBoundingClientRect.mockRestore()
+    }
+  })
+
+  it('keeps an active issue selected when diagnostics are recreated and resets it when removed', () => {
+    const { rerender } = render(
+      <HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />,
+    )
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    textarea.setSelectionRange(4, 4)
+    fireEvent.select(textarea)
+
+    rerender(
+      <HarperDiagnosticEditor
+        value="It dont work."
+        diagnostics={[{ ...diagnostic, id: 'new-lint-request:0' }]}
+        onChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Active issue')).toBeInTheDocument()
+
+    rerender(<HarperDiagnosticEditor value="It dont work." diagnostics={[]} onChange={vi.fn()} />)
+    expect(screen.queryByText('Active issue')).not.toBeInTheDocument()
   })
 
   it('does not produce overlapping marks when Harper reports intersecting diagnostics', () => {

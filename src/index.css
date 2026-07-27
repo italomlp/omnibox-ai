@@ -166,6 +166,59 @@ html {
   border-radius: 0.125rem;
 }
 
+.harper-diagnostic-popover {
+  position: absolute;
+  z-index: var(--layer-popover40);
+  width: min(20rem, calc(100% - 1rem));
+  max-height: calc(100% - 1rem);
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  border-radius: 0.75rem;
+  background: rgba(24, 24, 27, 0.96);
+  box-shadow: 0 12px 28px -16px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* One issue panel moves beside the editor only when space permits. */
+.harper-diagnostic-workspace {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.harper-diagnostic-issues-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid rgba(63, 63, 70, 0.72);
+  border-radius: 0.75rem;
+  background: rgba(24, 24, 27, 0.32);
+  padding: 0.75rem;
+}
+
+.harper-diagnostic-issues-content {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .harper-diagnostic-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem);
+    align-items: stretch;
+  }
+
+  .harper-diagnostic-issues-panel {
+    max-height: 420px;
+  }
+
+  .harper-diagnostic-issues-content {
+    overflow-y: auto;
+    padding-right: 0.125rem;
+  }
+}
+
 .surface-nested {
   background: rgba(15, 15, 20, 0.45);
   backdrop-filter: blur(16px);
@@ -662,6 +715,17 @@ html.light .harper-diagnostic-textarea {
   background-color: transparent !important;
   color: transparent !important;
   caret-color: #18181b;
+}
+
+html.light .harper-diagnostic-popover {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(5, 150, 105, 0.35);
+  box-shadow: 0 12px 28px -16px rgba(15, 23, 42, 0.3);
+}
+
+html.light .harper-diagnostic-issues-panel {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(9, 9, 11, 0.1);
 }
 
 html.light input[type="range"] {

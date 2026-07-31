@@ -20,6 +20,28 @@ The core refactor and follow-up hardening work are implemented in the current wo
 - Root agent instructions are shortened and detailed project guidance lives under `.agents/`.
 - Durable implementation plans live under `docs/plans/`.
 
+## Documentation Cleanup Audit — 2026-07-30
+
+| Document | Classification | Notes |
+| --- | --- | --- |
+| `docs/plans/improvements-plan.md` | archive | Superseded by more specific plans; archived to `docs/archive/plans/improvements-plan.md`. |
+| `docs/draft-prompt.md` | archive | Historical draft; archived to `docs/archive/drafts/draft-prompt.md`. |
+| `docs/architecture/decisions.md` | keep | Current architecture record. |
+| `docs/architecture/electron-readiness.md` | keep | Future-only packaging guidance. |
+| `docs/roadmap/phases.md` | keep | Strategic roadmap baseline. |
+| `docs/plans/2026-07-20-developer-workbench-redesign.md` | keep | Active durable implementation plan. |
+| `docs/api/streaming-client.md` | keep | Provider/streaming reference; left untouched per scope. |
+| `docs/plans/2026-07-14-ui-quality-webllm-model-picker.md` | keep | WebLLM-specific initiative doc; left untouched per scope. |
+| `docs/plans/2026-07-14-workspace-url-and-layout-fixes.md` | keep | Mixed layout plan with active references. |
+| `docs/plans/2026-07-15-workspace-header-cv-and-webllm-theme-fixes.md` | keep | Mixed layout/theme plan with active references. |
+| `docs/superpowers/specs/2026-07-15-webllm-picker-styling-design.md` | keep | WebLLM-only initiative doc; left untouched per scope. |
+
+### Cleanup Notes
+
+- Historical material is archived rather than deleted.
+- Cross-links to provider, WebLLM, Ollama, and privacy behavior remain accurate.
+- Cleanup work also standardized theme tokens and light/dark usage in shared application surfaces.
+
 Remaining follow-up:
 
 - Add formal unit/component tests if the project adopts a test runner.

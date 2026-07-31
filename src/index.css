@@ -3,8 +3,28 @@
 
 html {
   color-scheme: dark;
+  --app-bg: #09090b;
+  --app-canvas: #09090b;
+  --app-surface: rgba(15, 15, 20, 0.45);
+  --app-surface-strong: rgba(24, 24, 27, 0.96);
+  --app-surface-muted: rgba(24, 24, 27, 0.32);
+  --app-surface-hover: rgba(20, 20, 30, 0.55);
+  --app-border: rgba(255, 255, 255, 0.05);
+  --app-border-strong: rgba(255, 255, 255, 0.08);
+  --app-text: #f4f4f5;
+  --app-text-muted: #d4d4d8;
+  --app-text-faint: #a1a1aa;
+  --app-accent: #4f46e5;
+  --app-accent-soft: rgba(99, 102, 241, 0.15);
+  --app-success: #10b981;
+  --app-success-soft: rgba(16, 185, 129, 0.15);
+  --app-warning: #f59e0b;
+  --app-warning-soft: rgba(245, 158, 11, 0.14);
+  --app-danger: #ef4444;
+  --app-danger-soft: rgba(239, 68, 68, 0.14);
   --focus-ring: rgba(99, 102, 241, 0.45);
   --focus-ring-soft: rgba(99, 102, 241, 0.16);
+  --focus-outer: rgb(9 9 11 / 0.85);
   --layer-header10: 10;
   --layer-backdrop20: 20;
   --layer-sidebar30: 30;
@@ -40,8 +60,8 @@ html {
 
 @layer base {
   body {
-    background-color: #09090b; /* bg-zinc-950 */
-    color: #f4f4f5; /* text-zinc-100 */
+    background-color: var(--app-bg);
+    color: var(--app-text);
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -55,12 +75,221 @@ html {
 
   :where(button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
     outline: 2px solid transparent;
-    box-shadow: 0 0 0 2px rgb(9 9 11 / 0.85), 0 0 0 4px var(--focus-ring);
+    box-shadow: 0 0 0 2px var(--focus-outer), 0 0 0 4px var(--focus-ring);
   }
 
   input[type="range"]:focus-visible {
-    box-shadow: 0 0 0 2px rgb(9 9 11 / 0.85), 0 0 0 4px var(--focus-ring);
+    box-shadow: 0 0 0 2px var(--focus-outer), 0 0 0 4px var(--focus-ring);
   }
+}
+
+.theme-shell {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+}
+
+.theme-canvas {
+  background-color: var(--app-canvas);
+  color: var(--app-text);
+}
+
+.theme-panel,
+.glass-panel,
+.surface-nested,
+.settings-provider-card,
+.privacy-banner,
+.privacy-provider-card {
+  background: var(--app-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+}
+
+.theme-panel-strong {
+  background: var(--app-surface-strong);
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+}
+
+.theme-panel-muted {
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+}
+
+.theme-panel-danger {
+  background: var(--app-danger-soft);
+  border: 1px solid color-mix(in srgb, var(--app-danger) 28%, transparent);
+  color: color-mix(in srgb, var(--app-danger) 82%, white);
+}
+
+.theme-panel-success {
+  background: var(--app-success-soft);
+  border: 1px solid color-mix(in srgb, var(--app-success) 28%, transparent);
+  color: color-mix(in srgb, var(--app-success) 82%, white);
+}
+
+.theme-panel-hover,
+.glass-panel-hover,
+.app-nav-item,
+.theme-icon-button,
+.button-primary,
+.button-secondary,
+.button-icon,
+.button-danger,
+.status-card,
+.status-pill,
+.model-control {
+  transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+.theme-panel-hover:hover,
+.glass-panel-hover:hover {
+  background: var(--app-surface-hover);
+  border-color: var(--app-border-strong);
+}
+
+.theme-field,
+.glass-input,
+.model-control {
+  background: color-mix(in srgb, var(--app-canvas) 70%, transparent);
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+}
+
+.theme-field:focus-visible,
+.glass-input:focus-visible,
+.model-control:focus-visible {
+  border-color: color-mix(in srgb, var(--app-accent) 72%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-canvas) 88%, transparent), 0 0 0 4px var(--focus-ring);
+  outline: none;
+}
+
+.theme-button-primary,
+.button-primary {
+  background: var(--app-accent);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 75%, transparent);
+  color: #fff;
+}
+
+.theme-button-secondary,
+.button-secondary {
+  background: color-mix(in srgb, var(--app-surface-muted) 88%, var(--app-canvas));
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+}
+
+.theme-button-danger,
+.button-danger {
+  background: var(--app-danger-soft);
+  border: 1px solid color-mix(in srgb, var(--app-danger) 35%, transparent);
+  color: #fca5a5;
+}
+
+.theme-button-icon,
+.button-icon,
+.theme-icon-button {
+  background: color-mix(in srgb, var(--app-surface-muted) 78%, var(--app-canvas));
+  border: 1px solid var(--app-border);
+  color: var(--app-text-faint);
+}
+
+.theme-button-icon:hover,
+.button-icon:hover,
+.theme-icon-button:hover,
+.theme-button-secondary:hover,
+.button-secondary:hover {
+  background: var(--app-surface-hover);
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
+}
+
+.theme-chip,
+.status-card,
+.status-pill,
+.theme-switch-track {
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+}
+
+.theme-chip-success,
+.status-card-success,
+.status-pill-success {
+  background: var(--app-success-soft);
+  border-color: color-mix(in srgb, var(--app-success) 24%, transparent);
+  color: color-mix(in srgb, var(--app-success) 84%, white);
+}
+
+.theme-chip-warning {
+  background: var(--app-warning-soft);
+  border-color: color-mix(in srgb, var(--app-warning) 24%, transparent);
+  color: color-mix(in srgb, var(--app-warning) 82%, white);
+}
+
+.theme-chip-danger {
+  background: var(--app-danger-soft);
+  border-color: color-mix(in srgb, var(--app-danger) 24%, transparent);
+  color: color-mix(in srgb, var(--app-danger) 84%, white);
+}
+
+.theme-label,
+.theme-text-muted {
+  color: var(--app-text-muted);
+}
+
+.theme-text-faint {
+  color: var(--app-text-faint);
+}
+
+.theme-label-strong,
+.theme-text-strong {
+  color: var(--app-text);
+}
+
+.theme-switch-track {
+  position: relative;
+}
+
+.theme-switch-track::after {
+  background: color-mix(in srgb, var(--app-text-faint) 72%, white);
+}
+
+.theme-switch-track[aria-checked="true"],
+input:checked + .theme-switch-track {
+  background: var(--app-success);
+}
+
+.theme-switch-track[aria-checked="true"]::after,
+input:checked + .theme-switch-track::after {
+  background: #fff;
+}
+
+.theme-accent-text {
+  color: var(--app-accent);
+}
+
+.theme-success-text {
+  color: var(--app-success);
+}
+
+.theme-warning-text {
+  color: var(--app-warning);
+}
+
+.theme-danger-text {
+  color: var(--app-danger);
+}
+
+.theme-divider {
+  background: var(--app-border);
+}
+
+.theme-overlay {
+  background: color-mix(in srgb, var(--app-canvas) 64%, transparent);
 }
 
 /* Custom scrollbar utility */
@@ -81,35 +310,18 @@ html {
 
 /* Custom glassmorphism utilities */
 .glass-panel {
-  background: rgba(15, 15, 20, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-color: var(--app-border);
 }
 
 .glass-panel-hover {
-  transition-property: background-color, border-color, box-shadow, transform, opacity;
   transition-duration: 250ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
-.glass-panel-hover:hover {
-  background: rgba(20, 20, 30, 0.55);
-  border-color: rgba(255, 255, 255, 0.08);
-}
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #f4f4f5;
   transition-property: background-color, border-color, color, box-shadow, transform;
   transition-duration: 150ms;
   transition-timing-function: ease-in-out;
-}
-.glass-input:focus-visible {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(99, 102, 241, 0.4);
-  outline: none;
-  box-shadow: 0 0 10px -2px rgba(99, 102, 241, 0.25);
 }
 
 /* The textarea remains the editing authority; this layer only mirrors its text. */
@@ -158,7 +370,7 @@ html {
 .harper-diagnostic-textarea {
   padding: 1rem;
   color: transparent;
-  caret-color: #e4e4e7;
+  caret-color: var(--app-text-muted);
   scrollbar-gutter: stable;
 }
 
@@ -169,8 +381,8 @@ html {
 
 .harper-diagnostic-mark {
   color: inherit;
-  background: rgb(251 191 36 / 0.2);
-  border-bottom: 2px dotted rgb(251 191 36 / 0.95);
+  background: color-mix(in srgb, var(--app-warning) 20%, transparent);
+  border-bottom: 2px dotted color-mix(in srgb, var(--app-warning) 92%, white);
   border-radius: 0.125rem;
 }
 
@@ -181,9 +393,9 @@ html {
   max-height: calc(100% - 1rem);
   overflow: auto;
   padding: 0.75rem;
-  border: 1px solid rgba(52, 211, 153, 0.45);
+  border: 1px solid color-mix(in srgb, var(--app-success) 45%, transparent);
   border-radius: 0.75rem;
-  background: rgba(24, 24, 27, 0.96);
+  background: var(--app-surface-strong);
   box-shadow: 0 12px 28px -16px rgba(0, 0, 0, 0.9);
   pointer-events: auto;
   user-select: text;
@@ -201,9 +413,9 @@ html {
   min-width: 0;
   flex-direction: column;
   gap: 0.75rem;
-  border: 1px solid rgba(63, 63, 70, 0.72);
+  border: 1px solid var(--app-border);
   border-radius: 0.75rem;
-  background: rgba(24, 24, 27, 0.32);
+  background: var(--app-surface-muted);
   padding: 0.75rem;
 }
 
@@ -228,10 +440,7 @@ html {
 }
 
 .surface-nested {
-  background: rgba(15, 15, 20, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-color: var(--app-border);
 }
 
 .control-compact,
@@ -273,35 +482,23 @@ html {
 .button-primary {
   min-height: 2.5rem;
   padding: 0.5rem 1rem;
-  background: rgb(79 70 229);
-  color: #fff;
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  box-shadow: 0 10px 24px -18px rgba(79, 70, 229, 0.85);
+  box-shadow: 0 10px 24px -18px color-mix(in srgb, var(--app-accent) 84%, black);
 }
 
 .button-secondary {
   min-height: 2.5rem;
   padding: 0.5rem 0.875rem;
-  background: rgba(39, 39, 42, 0.68);
-  color: #d4d4d8;
-  border: 1px solid rgba(63, 63, 70, 0.82);
 }
 
 .button-icon {
   min-height: 2.75rem;
   min-width: 2.75rem;
   padding: 0.625rem;
-  border: 1px solid rgba(63, 63, 70, 0.72);
-  background: rgba(39, 39, 42, 0.68);
-  color: #a1a1aa;
 }
 
 .button-danger {
   min-height: 2.5rem;
   padding: 0.5rem 0.875rem;
-  background: rgba(127, 29, 29, 0.24);
-  color: #f87171;
-  border: 1px solid rgba(127, 29, 29, 0.32);
 }
 
 .theme-icon-button,
@@ -331,18 +528,15 @@ html {
 }
 
 .app-header {
-  background: rgba(9, 9, 11, 0.72);
+  background: color-mix(in srgb, var(--app-canvas) 72%, transparent);
 }
 
 .app-sidebar {
-  background: #09090b;
+  background: var(--app-canvas);
 }
 
 .settings-provider-card {
-  background: rgba(15, 15, 20, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-color: rgba(255, 255, 255, 0.04);
+  border-color: var(--app-border);
 }
 
 .theme-icon-button,
@@ -375,20 +569,27 @@ html {
    ========================================================================== */
 html.light {
   color-scheme: light;
-  --focus-ring: rgba(79, 70, 229, 0.28);
   --app-bg: #f4f4f5;
-  --app-surface: #ffffff;
-  --app-surface-muted: #f8fafc;
-  --app-surface-hover: #f1f5f9;
-  --app-border: rgba(39, 39, 42, 0.12);
-  --app-border-strong: rgba(39, 39, 42, 0.18);
-  --app-text: #18181b;
+  --app-canvas: #fafafa;
+  --app-surface: rgba(255, 255, 255, 0.88);
+  --app-surface-strong: rgba(255, 255, 255, 0.98);
+  --app-surface-muted: rgba(248, 250, 252, 0.95);
+  --app-surface-hover: rgba(241, 245, 249, 0.98);
+  --app-border: rgba(9, 9, 11, 0.08);
+  --app-border-strong: rgba(9, 9, 11, 0.12);
+  --app-text: #09090b;
   --app-text-muted: #52525b;
   --app-text-faint: #71717a;
-  --app-indigo: #4f46e5;
-  --app-emerald: #047857;
-  --app-red: #dc2626;
-  --app-amber: #b45309;
+  --app-accent: #4f46e5;
+  --app-accent-soft: rgba(79, 70, 229, 0.08);
+  --app-success: #047857;
+  --app-success-soft: rgba(5, 150, 105, 0.08);
+  --app-warning: #b45309;
+  --app-warning-soft: rgba(217, 119, 6, 0.1);
+  --app-danger: #dc2626;
+  --app-danger-soft: rgba(220, 38, 38, 0.08);
+  --focus-ring: rgba(79, 70, 229, 0.28);
+  --focus-outer: rgb(244 244 245 / 0.92);
 }
 
 html.light body {
@@ -452,7 +653,7 @@ html.light .app-nav-item:hover {
 html.light .app-nav-item-active {
   background: rgba(79, 70, 229, 0.08) !important;
   border-color: rgba(79, 70, 229, 0.18) !important;
-  color: var(--app-indigo) !important;
+  color: var(--app-accent) !important;
 }
 
 html.light .status-card,
@@ -467,7 +668,7 @@ html.light .status-pill-success,
 html.light .privacy-banner.bg-emerald-950\/20 {
   background: rgba(5, 150, 105, 0.08) !important;
   border-color: rgba(5, 150, 105, 0.22) !important;
-  color: var(--app-emerald) !important;
+  color: var(--app-success) !important;
 }
 
 html.light .settings-provider-card {
@@ -548,12 +749,11 @@ html.light .bg-\[\#09090b\] {
 }
 
 html.light .bg-zinc-950,
-html.light .bg-zinc-950\/40 {
-  background-color: #ffffff !important;
-  color: #09090b !important;
-}
+html.light .bg-zinc-950\/40,
 html.light .bg-zinc-950\/50,
-html.light .bg-zinc-950\/60 {
+html.light .bg-zinc-950\/60,
+html.light .bg-zinc-950\/70,
+html.light .bg-zinc-950\/80 {
   background-color: #ffffff !important;
   color: #09090b !important;
 }
@@ -572,6 +772,44 @@ html.light .bg-zinc-900 {
   background-color: #f4f4f5 !important;
   color: #09090b !important;
 }
+
+html.light .bg-zinc-800,
+html.light .hover\:bg-zinc-800:hover,
+html.light .hover\:bg-zinc-900\/40:hover,
+html.light .hover\:bg-zinc-900\/60:hover,
+html.light .hover\:bg-zinc-900\/70:hover,
+html.light .hover\:bg-zinc-900\/80:hover {
+  background-color: var(--app-surface-hover) !important;
+}
+
+html.light .bg-indigo-950\/20,
+html.light .bg-indigo-950\/30,
+html.light .bg-indigo-950\/40,
+html.light .bg-indigo-950\/50,
+html.light .bg-indigo-950\/60,
+html.light .bg-indigo-500\/10 {
+  background-color: var(--app-accent-soft) !important;
+  color: var(--app-accent) !important;
+}
+
+html.light .hover\:bg-indigo-950\/50:hover,
+html.light .hover\:bg-indigo-950\/60:hover {
+  background-color: color-mix(in srgb, var(--app-accent) 14%, white) !important;
+}
+
+html.light .bg-cyan-950\/10,
+html.light .bg-cyan-950\/20,
+html.light .bg-cyan-950\/40,
+html.light .hover\:bg-cyan-950\/60:hover {
+  background-color: var(--app-accent-soft) !important;
+}
+
+html.light .bg-rose-950\/15,
+html.light .bg-rose-950\/20,
+html.light .bg-rose-950\/40,
+html.light .hover\:bg-rose-950\/40:hover {
+  background-color: var(--app-danger-soft) !important;
+}
 html.light .bg-emerald-950\/20 {
   background-color: rgba(16, 185, 129, 0.08) !important;
   color: #065f46 !important;
@@ -579,10 +817,6 @@ html.light .bg-emerald-950\/20 {
 html.light .bg-emerald-950\/10 {
   background-color: rgba(16, 185, 129, 0.06) !important;
   color: #065f46 !important;
-}
-html.light .bg-indigo-950\/30 {
-  background-color: rgba(99, 102, 241, 0.08) !important;
-  color: #4338ca !important;
 }
 html.light .bg-violet-950\/40 {
   background-color: rgba(139, 92, 246, 0.08) !important;
@@ -635,17 +869,26 @@ html.light .text-zinc-500 {
   color: #52525b !important; /* Subtitle/description text */
 }
 html.light .text-zinc-600 {
-  color: #a1a1aa !important;
+  color: #3f3f46 !important;
 }
+html.light .text-indigo-100,
+html.light .text-indigo-200,
+html.light .text-indigo-300,
 html.light .text-indigo-400 {
   color: #4f46e5 !important;
 }
-html.light .text-indigo-300 {
-  color: #4338ca !important;
+
+html.light .text-cyan-100,
+html.light .text-cyan-200,
+html.light .text-cyan-300,
+html.light .text-cyan-400 {
+  color: var(--app-accent) !important;
 }
 html.light .text-violet-400 {
   color: #7c3aed !important;
 }
+html.light .text-emerald-100,
+html.light .text-emerald-200,
 html.light .text-emerald-300 {
   color: #047857 !important;
 }
@@ -654,23 +897,38 @@ html.light .text-emerald-400 {
 }
 
 html.light .text-red-400 {
-  color: var(--app-red) !important;
+  color: var(--app-danger) !important;
 }
 
+html.light .text-rose-100,
+html.light .text-rose-200,
+html.light .text-rose-300 {
+  color: var(--app-danger) !important;
+}
+
+html.light .text-amber-100,
+html.light .text-amber-100\/75,
+html.light .text-amber-100\/90,
+html.light .text-amber-200,
 html.light .text-amber-300,
 html.light .text-amber-400,
 html.light .text-amber-400\/90,
 html.light .text-amber-500\/80,
 html.light .text-yellow-500 {
-  color: var(--app-amber) !important;
+  color: var(--app-warning) !important;
 }
 
 /* Borders overrides */
 html.light .border-zinc-900\/60,
 html.light .border-zinc-800\/50,
+html.light .border-zinc-800\/60,
+html.light .border-zinc-800\/70,
 html.light .border-zinc-800\/40,
 html.light .border-zinc-800\/80,
+html.light .border-zinc-700\/60,
+html.light .border-zinc-700\/70,
 html.light .border-zinc-800,
+html.light .border-zinc-700,
 html.light .border-zinc-900,
 html.light .border-emerald-800\/30,
 html.light .border-emerald-900\/20,
@@ -679,10 +937,40 @@ html.light .border-violet-900\/40 {
   border-color: rgba(9, 9, 11, 0.08) !important;
 }
 
+html.light .border-indigo-700,
+html.light .border-indigo-700\/60,
+html.light .border-indigo-700\/70,
+html.light .hover\:border-indigo-700:hover,
+html.light .hover\:border-indigo-700\/70:hover {
+  border-color: color-mix(in srgb, var(--app-accent) 32%, transparent) !important;
+}
+
+html.light .border-cyan-900\/20,
+html.light .border-cyan-900\/40,
+html.light .border-cyan-900\/50,
+html.light .hover\:border-cyan-700:hover {
+  border-color: color-mix(in srgb, var(--app-accent) 28%, transparent) !important;
+}
+
 html.light .border-red-900\/20,
 html.light .border-red-900\/30,
 html.light .border-red-800 {
   border-color: rgba(220, 38, 38, 0.22) !important;
+}
+
+html.light .border-rose-900\/30,
+html.light .border-rose-900\/40,
+html.light .border-rose-500\/40,
+html.light .hover\:border-rose-800:hover {
+  border-color: color-mix(in srgb, var(--app-danger) 30%, transparent) !important;
+}
+
+html.light .focus\:border-cyan-500:focus {
+  border-color: var(--app-accent) !important;
+}
+
+html.light .focus\:ring-cyan-500\/20:focus {
+  --tw-ring-color: color-mix(in srgb, var(--app-accent) 20%, transparent) !important;
 }
 
 html.light .border-amber-900\/30 {
@@ -692,6 +980,7 @@ html.light .border-amber-900\/30 {
 /* Inputs, textareas, and selects */
 html.light textarea,
 html.light input[type="text"],
+html.light input[type="search"],
 html.light select {
   background-color: #ffffff !important;
   color: #09090b !important;
@@ -699,6 +988,7 @@ html.light select {
 }
 html.light textarea:focus,
 html.light input[type="text"]:focus,
+html.light input[type="search"]:focus,
 html.light select:focus {
   border-color: rgba(99, 102, 241, 0.5) !important;
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12) !important;
@@ -738,16 +1028,16 @@ html.light .harper-diagnostic-issues-panel {
 
 html.light input[type="range"] {
   background-color: #e4e4e7 !important;
-  accent-color: var(--app-indigo);
+  accent-color: var(--app-accent);
 }
 
 html.light input[type="range"]::-webkit-slider-thumb {
-  background: var(--app-indigo);
+  background: var(--app-accent);
 }
 
 html.light input[type="range"]::-moz-range-thumb {
-  background: var(--app-indigo);
-  border-color: var(--app-indigo);
+  background: var(--app-accent);
+  border-color: var(--app-accent);
 }
 
 /* Stored resume chips, history cards, and progress overlays */

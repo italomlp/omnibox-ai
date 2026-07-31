@@ -21,11 +21,11 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   return (
     <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end sm:gap-3">
       <div className="flex min-w-0 flex-col gap-1 sm:w-auto">
-        <label className="text-[10px] text-zinc-500 font-semibold uppercase">Provider</label>
+        <label className="text-[10px] theme-text-faint font-semibold uppercase">Provider</label>
         <select
           value={activeProvider}
           onChange={(e) => onProviderChange(e.target.value as ProviderId)}
-          className="control-standard model-control min-w-0 h-9 w-full cursor-pointer rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500 sm:w-56"
+          className="control-standard model-control min-w-0 h-9 w-full cursor-pointer rounded-md px-3 text-xs sm:w-56"
         >
           {availableProviders.map((prov) => (
             <option key={prov} value={prov}>
@@ -40,7 +40,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       </div>
 
       <div className="flex min-w-0 flex-col gap-1 sm:w-auto">
-        <label className="text-[10px] text-zinc-500 font-semibold uppercase">Model</label>
+        <label className="text-[10px] theme-text-faint font-semibold uppercase">Model</label>
         {activeProvider === 'webgpu' ? (
           <WebLLMModelPicker
             value={selectedModel}
@@ -54,7 +54,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
           <select
             value={selectedModel}
             onChange={(e) => onModelChange(e.target.value)}
-            className="control-standard model-control min-w-0 h-9 w-full cursor-pointer rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500 sm:w-64"
+            className="control-standard model-control min-w-0 h-9 w-full cursor-pointer rounded-md px-3 text-xs sm:w-64"
           >
             {(() => {
               const list = PROVIDER_MODELS_LIST[activeProvider] || []

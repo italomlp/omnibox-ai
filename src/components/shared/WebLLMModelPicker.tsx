@@ -39,11 +39,11 @@ const formatDownloadSize = (value: number): string => {
 const getTaskBadgeClass = (status: WebLLMModelConfig['taskSupport'][WebLLMTaskKey]): string => {
   switch (status) {
     case 'supported':
-      return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300 light:border-emerald-500/20 light:bg-emerald-500/8 light:text-emerald-700';
+      return 'theme-chip-success';
     case 'best-effort':
-      return 'border-amber-500/25 bg-amber-500/10 text-amber-300 light:border-amber-500/20 light:bg-amber-500/8 light:text-amber-700';
+      return 'theme-chip-warning';
     default:
-      return 'border-rose-500/25 bg-rose-500/10 text-rose-300 light:border-rose-500/20 light:bg-rose-500/8 light:text-rose-700';
+      return 'theme-chip-danger';
   }
 };
 
@@ -298,14 +298,14 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
       : null;
 
   const menuContent = (
-      <div
-        ref={menuMode === 'portal' ? portalRef : undefined}
-        className={classNames(
-          menuMode === 'portal'
-            ? 'fixed left-0 top-0 layer-popover40 w-auto'
-            : 'absolute left-0 right-0 top-full layer-popover40 mt-2',
-          'rounded-2xl border border-zinc-800 bg-zinc-950/98 shadow-[0_25px_50px_-12px_rgba(255,255,255,0.08),0_0_1px_1px_rgba(255,255,255,0.1)] light:bg-white light:border-zinc-200 light:shadow-[0_25px_50px_-12px_rgba(9,9,11,0.2),0_0_1px_1px_rgba(9,9,11,0.05)] p-2 backdrop-blur'
-        )}
+        <div
+          ref={menuMode === 'portal' ? portalRef : undefined}
+          className={classNames(
+            menuMode === 'portal'
+              ? 'fixed left-0 top-0 layer-popover40 w-auto'
+              : 'absolute left-0 right-0 top-full layer-popover40 mt-2',
+            'theme-panel-strong rounded-2xl shadow-[0_25px_50px_-12px_rgba(255,255,255,0.08),0_0_1px_1px_rgba(255,255,255,0.1)] p-2 backdrop-blur'
+          )}
       style={
         menuMode === 'portal'
           ? portalStyle
@@ -327,9 +327,9 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
       >
         {configsByTier.map((group) => (
           <div key={group.tier} className="space-y-2 p-1.5">
-            <div className="flex items-center gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 light:text-zinc-400">
+            <div className="flex items-center gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
               <span>{WEBLLM_TIER_LABELS[group.tier]}</span>
-              <span className="h-px flex-1 bg-zinc-700/40 light:bg-zinc-200" />
+              <span className="h-px flex-1 theme-divider" />
             </div>
 
             <div className="space-y-1.5">
@@ -350,26 +350,26 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => selectModel(config.modelId)}
                     className={classNames(
-                      'cursor-pointer rounded-xl border px-3 py-3 text-left transition-colors',
+                      'cursor-pointer rounded-xl border px-3 py-3 text-left transition-colors theme-panel',
                       isActive
-                        ? 'border-indigo-500/40 bg-indigo-500/10 light:border-indigo-600/40 light:bg-indigo-600/5'
-                        : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900/80 light:border-zinc-200 light:bg-white light:hover:border-zinc-300 light:hover:bg-zinc-50',
+                        ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)]'
+                        : 'hover:border-[color:var(--app-border-strong)] hover:bg-[color:var(--app-surface-hover)]',
                       isSelected && 'ring-1 ring-inset ring-indigo-500/30'
                     )}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 space-y-1">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <span className="min-w-0 truncate text-sm font-medium text-zinc-100 light:text-zinc-900">{config.label}</span>
-                          <span className="rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 light:border-zinc-200 light:bg-zinc-100 light:text-zinc-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                          <span className="min-w-0 truncate text-sm font-medium theme-text-strong">{config.label}</span>
+                          <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip">
                             {config.family}
                           </span>
-                          <span className="rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 light:border-zinc-200 light:bg-zinc-100 light:text-zinc-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                          <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip">
                             {config.parameterCount}
                           </span>
                         </div>
 
-                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-400 light:text-zinc-500">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] theme-text-faint">
                           <span className="inline-flex items-center gap-1">
                             <Cpu className="h-3 w-3" />
                             {formatMemoryMB(config.recommendedAvailableMemoryMB)} available GPU/shared memory
@@ -381,8 +381,8 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
                         </p>
                       </div>
 
-                      <div className="flex flex-shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-                        {isSelected ? <Check className="h-3.5 w-3.5 text-indigo-400" /> : null}
+                      <div className="flex flex-shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wide theme-text-faint">
+                        {isSelected ? <Check className="h-3.5 w-3.5 theme-accent-text" /> : null}
                         <span>{WEBLLM_TIER_LABELS[config.tier]}</span>
                       </div>
                     </div>
@@ -404,27 +404,27 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
                       })}
                     </div>
 
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-zinc-400">
-                      <span className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 light:border-zinc-200 light:bg-zinc-100 light:text-zinc-500 px-2 py-0.5">
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] theme-text-faint">
+                      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 theme-chip">
                         <Sparkles className="h-3 w-3" />
                         Download {formatDownloadSize(config.downloadSizeMB)}
                       </span>
-                      <span className="rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 light:border-zinc-200 light:bg-zinc-100 light:text-zinc-500 px-2 py-0.5">
+                      <span className="rounded-full border px-2 py-0.5 theme-chip">
                         Context {config.contextWindow.toLocaleString()} tokens
                       </span>
-                      <span className="rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 light:border-zinc-200 light:bg-zinc-100 light:text-zinc-500 px-2 py-0.5">
+                      <span className="rounded-full border px-2 py-0.5 theme-chip">
                         Max input {config.maxRecommendedInputTokens.toLocaleString()} tokens
                       </span>
                       {config.requiredWebGpuFeatures?.map((feature) => (
                         <span
                           key={feature}
-                          className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-amber-300"
-                        >
-                          Requires {feature}
-                        </span>
-                      ))}
+                            className="rounded-full border px-2 py-0.5 theme-chip-warning"
+                          >
+                            Requires {feature}
+                          </span>
+                        ))}
                       {config.warning ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-rose-300">
+                        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 theme-chip-danger">
                           <AlertTriangle className="h-3 w-3" />
                           {config.warning}
                         </span>
@@ -442,9 +442,9 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
 
   return (
     <div ref={rootRef} className={classNames('relative w-full min-w-0 space-y-3', className)}>
-      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
         <span>{label}</span>
-        <span className="rounded-full border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-zinc-400">
+        <span className="rounded-full border px-2 py-0.5 theme-chip">
           {WEBLLM_TIER_LABELS[selectedConfig.tier]}
         </span>
       </div>
@@ -459,36 +459,36 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
         onClick={() => (isOpen ? closePicker() : openPicker())}
         onKeyDown={handleTriggerKeyDown}
         className={classNames(
-          'flex w-full items-start justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 light:border-zinc-200 light:bg-white px-3 py-3 text-left transition-colors',
-          'hover:border-zinc-700 light:hover:border-zinc-300 focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30',
+          'flex w-full items-start justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors theme-panel',
+          'hover:border-[color:var(--app-border-strong)] focus:outline-none focus-visible:border-[color:var(--app-accent)] focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent-soft)]',
           disabled && 'cursor-not-allowed opacity-60'
         )}
       >
         <div className="min-w-0 space-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="min-w-0 truncate text-sm font-semibold text-zinc-100 light:text-zinc-900">{selectedConfig.label}</span>
-            <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-300">
+            <span className="min-w-0 truncate text-sm font-semibold theme-text-strong">{selectedConfig.label}</span>
+            <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip theme-accent-text">
               {WEBLLM_TIER_LABELS[selectedConfig.tier]}
             </span>
             {selectedConfig.warning ? (
-              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+              <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip-warning">
                 Warning
               </span>
             ) : null}
           </div>
 
-          <p className="text-xs leading-relaxed text-zinc-400 light:text-zinc-500">{hardwareSummary}</p>
+          <p className="text-xs leading-relaxed theme-text-faint">{hardwareSummary}</p>
         </div>
 
-        <div className="mt-0.5 flex items-center gap-1 text-zinc-400">
+        <div className="mt-0.5 flex items-center gap-1 theme-text-faint">
           {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </div>
       </button>
 
       {isOpen ? (menuMode === 'portal' ? createPortal(menuContent, document.body) : menuContent) : null}
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-400 light:border-zinc-200 light:bg-zinc-50/50 light:text-zinc-600 p-3 text-xs">
-        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 light:text-zinc-400">
+      <div className="rounded-xl border text-xs theme-panel-muted p-3">
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
           <span>Model details</span>
           {selectedTaskLabel ? (
             <span className={classNames('rounded-full border px-2 py-0.5', getTaskBadgeClass(selectedTaskStatus ?? 'supported'))}>
@@ -499,25 +499,25 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
 
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 light:text-zinc-400">Download size</p>
-            <p className="text-zinc-200 light:text-zinc-800">{formatDownloadSize(selectedConfig.downloadSizeMB)} actual model download.</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Download size</p>
+            <p className="theme-text-strong">{formatDownloadSize(selectedConfig.downloadSizeMB)} actual model download.</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 light:text-zinc-400">Memory guidance</p>
-            <p className="text-zinc-200 light:text-zinc-800">
+            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Memory guidance</p>
+            <p className="theme-text-strong">
               Minimum {formatMemoryMB(selectedConfig.minimumAvailableMemoryMB)} available GPU/shared memory; recommended {formatMemoryMB(selectedConfig.recommendedAvailableMemoryMB)} and {selectedConfig.recommendedSystemMemoryGB} GB RAM.
             </p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 light:text-zinc-400">Recommended use cases</p>
-            <p className="text-zinc-200 light:text-zinc-800">{selectedConfig.recommendedFor.join(', ')}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Recommended use cases</p>
+            <p className="theme-text-strong">{selectedConfig.recommendedFor.join(', ')}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 light:text-zinc-400">Task fit</p>
-            <p className="text-zinc-200 light:text-zinc-800">
+            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Task fit</p>
+            <p className="theme-text-strong">
               {selectedTaskLabel
                 ? selectedTaskStatus === 'blocked'
                   ? selectedTaskBlockMessage
@@ -546,14 +546,14 @@ export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
             );
           })}
           {selectedConfig.requiredWebGpuFeatures?.map((feature) => (
-            <span key={feature} className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-300">
+            <span key={feature} className="rounded-full border px-2 py-0.5 theme-chip-warning text-[10px]">
               Requires {feature}
             </span>
           ))}
         </div>
 
         {selectedConfig.warning ? (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-300 light:border-amber-600/25 light:bg-amber-600/8 light:text-amber-700 px-3 py-2">
+          <p className="theme-chip-warning mt-3 flex items-start gap-2 rounded-lg px-3 py-2">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
             <span>{selectedConfig.warning}</span>
           </p>

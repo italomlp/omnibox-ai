@@ -1,3 +1,4 @@
+import { ANDROID_LOCAL_INFERENCE_NOTE, isNativeAndroid } from '../platform/runtime'
 import { useState, useEffect } from 'react'
 import type * as webLLM from '@mlc-ai/web-llm'
 import {
@@ -72,12 +73,13 @@ export function useWebLLM(): WebLLMHook {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const hasGPU = 'gpu' in navigator && navigator.gpu !== undefined
+      const hasGPU = !isNativeAndroid() && 'gpu' in navigator && navigator.gpu !== undefined
       setIsSupported(hasGPU)
     }
   }, [])
 
   const loadModelLocked = async (modelId: string): Promise<webLLM.MLCEngineInterface | null> => {
+    if (isNativeAndroid()) throw new Error(ANDROID_LOCAL_INFERENCE_NOTE)
     const resolvedModelId = isSupportedWebLLMModel(modelId)
       ? modelId
       : PROVIDER_DEFAULT_MODELS.webgpu
@@ -164,6 +166,7 @@ export function useWebLLM(): WebLLMHook {
 
     const isAborted = () => abortRequested || Boolean(signal?.aborted)
 
+    if (isNativeAndroid()) throw new Error(ANDROID_LOCAL_INFERENCE_NOTE)
     const resolvedModelId = isSupportedWebLLMModel(modelId)
       ? modelId
       : PROVIDER_DEFAULT_MODELS.webgpu

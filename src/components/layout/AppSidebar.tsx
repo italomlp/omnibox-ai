@@ -1,3 +1,4 @@
+import { isNativeAndroid } from '../../platform/runtime'
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Cpu, Layers3, LibraryBig, Settings2, Shield, Sparkles, SquareStack } from 'lucide-react'
 import type { RouteDescriptor } from '../../navigation'
@@ -211,7 +212,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 ? 'Verifying GPU...'
                 : webGpuSupported
                 ? 'WebGPU Active'
-                : 'No WebGPU'
+                : isNativeAndroid() ? 'WebLLM disabled in Android alpha' : 'No WebGPU'
             }
           >
               <Cpu className={`w-3.5 h-3.5 flex-shrink-0 ${
@@ -227,7 +228,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                   ? 'Verifying GPU...'
                   : webGpuSupported
                   ? 'WebGPU Active'
-                  : 'No WebGPU'}
+                  : isNativeAndroid() ? 'WebLLM disabled in Android alpha' : 'No WebGPU'}
               </span>
             )}
           </div>

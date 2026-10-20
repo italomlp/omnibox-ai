@@ -1,3 +1,4 @@
+import { getProviderUnavailableReason } from '../../platform/runtime'
 import { getProviderCapabilities } from './providerCapabilities'
 import type { ExecutionPolicyDecision } from './types'
 
@@ -18,6 +19,11 @@ export const evaluateExecutionPolicy = (
       providerId: requestedProviderId,
       reason: UNKNOWN_PROVIDER_DENY_REASON,
     }
+  }
+
+  const unavailableReason = getProviderUnavailableReason(requestedProviderId)
+  if (unavailableReason) {
+    return { allowed: false, providerId: requestedProviderId, reason: unavailableReason, capabilities }
   }
 
   if (privacyMode && capabilities.kind === 'cloud') {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import * as webLLM from '@mlc-ai/web-llm'
+import type * as webLLM from '@mlc-ai/web-llm'
 import {
   PROVIDER_DEFAULT_MODELS,
   WEBLLM_MODEL_CONFIG_BY_ID,
@@ -103,8 +103,9 @@ export function useWebLLM(): WebLLMHook {
     setSpeed('')
 
     try {
-      // Create the MLC Engine instance
-      const engine = await webLLM.CreateMLCEngine(resolvedModelId, {
+      // Keep the large GPU runtime out of startup and cloud/local grammar flows.
+      const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
+      const engine = await CreateMLCEngine(resolvedModelId, {
         initProgressCallback: (report) => {
           setLoadProgress(report.text)
           

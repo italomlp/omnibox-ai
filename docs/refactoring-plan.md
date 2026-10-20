@@ -6,6 +6,19 @@
 
 ## Current Status — 2026-07-13
 
+### Validation update — 2026-10-20
+
+- Restored dependencies after repairing missing transitive lockfile entries; `npm ci` now succeeds.
+- Alpha validation: `npm run lint` passes with no diagnostics; all 85 tests across eleven files plus five release-manifest CLI checks pass. Independent web and release safety reviews pass.
+- `npm run build` succeeds. Alpha preparation reduces the main JavaScript entry from 6,504 kB to approximately 401 kB by deferring WebLLM and Grammar/Career routes. The deferred 6,025 kB WebLLM vendor chunk retains its visible size warning; Harper WASM and PDF worker remain self-hosted.
+- All six tool routes load in browser smoke checks. Local Harper diagnostics and applying a suggestion work; regex sample matching works; Type/JSDoc invalid-JSON and Schema Translator empty-input validation work. Career and Speech Studio controls render, and Library and Workbench load.
+- Catalog and Workbench have no document-level horizontal overflow at the tested phone-width viewport. This is a limited browser check, not Android-device validation.
+- Cloud calls, Ollama calls, WebLLM model downloads/inference, document imports, and microphone/audio capture were not exercised. The test browser reports no available synthesis voices.
+- AppleDouble metadata was being discovered as source/test files. Writable sidecars were moved to `/tmp/omnibox-appledouble-backup-20261020` with relative paths preserved; protected `.agents/` sidecars remain untouched. Existing executable-bit changes remain untouched.
+- At validation start TypeScript strict mode was disabled; the alpha preparation now enables it in app and tooling configurations and passes strict compilation.
+- The older follow-ups below about adopting a test runner and vendoring document parsers are superseded: Vitest and bundled lazy PDF/DOCX imports already exist.
+- See [Android effort assessment](architecture/android-assessment.md) for packaging options and remaining platform risks.
+
 The core refactor and follow-up hardening work are implemented in the current working tree:
 
 - App shell is decomposed into layout components and feature workspaces.

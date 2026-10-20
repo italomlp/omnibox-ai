@@ -97,6 +97,23 @@ describe('createNavigationController', () => {
     expect(setRoute.mock.calls.length).toBe(callsBeforeStop)
   })
 
+  it('preserves the deployed project prefix through legacy startup, navigation, and back', () => {
+    const window = createFakeNavigationWindow('https://example.test/omnibox-ai/?workspace=grammar')
+    const setRoute = vi.fn()
+    const controller = createNavigationController({ window, setRoute })
+    const stop = controller.start()
+
+    expect(window.location.href).toBe('https://example.test/omnibox-ai/?tool=grammar-tone')
+    controller.navigate({ view: 'tool', tool: 'career' })
+    expect(window.location.href).toBe('https://example.test/omnibox-ai/?tool=career')
+    expect(setRoute).toHaveBeenLastCalledWith({ view: 'tool', tool: 'career' })
+
+    window.location.href = 'https://example.test/omnibox-ai/?tool=grammar-tone'
+    window.emitPopState()
+    expect(setRoute).toHaveBeenLastCalledWith({ view: 'tool', tool: 'grammar-tone' })
+    stop()
+  })
+
   it('does not write history when the target route is already current and canonical', () => {
     const window = createFakeNavigationWindow('https://example.test/workspace?foo=1&view=tools#draft')
     const setRoute = vi.fn()

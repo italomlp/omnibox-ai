@@ -57,7 +57,9 @@ The action revisions are pinned to immutable commits read from the official `act
 
 ## 4. Prepare Play internal testing
 
-The owner creates the Play Console app as a free English productivity app and uses the [draft listing](play-listing-draft.md). Add `italomlp@gmail.com` as the initial internal tester, then obtain and verify the tester opt-in link. Supply the hosted privacy page only after it is publicly reachable.
+Starting without Google Play service credentials? Follow the numbered [first-release and credential setup guide](play-first-release-guide.md) before using the optional CLI below. The first signed AAB is uploaded through Console and kept as a draft; service-account setup comes afterwards.
+
+The owner creates the Play Console app as a free English productivity app and uses the [draft listing](play-listing-draft.md). Add `italomlp@gmail.com` as the initial internal tester; after the owner rolls out the test, obtain and verify the tester opt-in link. Supply the hosted privacy page only after it is publicly reachable.
 
 Answer Data safety, ads, content rating, target audience, app access, and other Console declarations from the actual signed app behavior and provider flows. Do not copy a blanket “no data collected/shared” answer from the client-only architecture. Entering cloud prompts, network provider traffic, imported documents, and API credentials needs accurate review. Play may require additional setup or testing for this developer account. No Console declarations or upload acceptance are assumed complete here.
 

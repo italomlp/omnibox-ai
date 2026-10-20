@@ -92,3 +92,5 @@ Prepare a draft release for `v0.1.0-alpha.1` targeting the recorded web commit, 
 - **Play draft:** owner discards or replaces the unpublished draft in Console. **Active track:** owner stops/halts the affected rollout where Console allows it, then supplies a corrected signed bundle with a higher version code. Do not expect a lower version code to install over a newer one. Preserve signing identity.
 - **GitHub:** owner edits or withdraws incorrect release materials; record replaced artifact hashes. Removing a release or changing notes does not undo an installed app or a Pages deployment.
 - Record what changed, old/new source SHAs, version codes, artifact digests, and follow-up test results in the incident/release evidence. Never delete local user data as an automatic rollback step.
+
+For the verified inherited-domain/Vercel redirect conflict and exact owner steps, use [first web publication](web-first-release-guide.md) before running the web workflow.

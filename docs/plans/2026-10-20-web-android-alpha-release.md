@@ -81,3 +81,8 @@
 - Pages configured workflow-only; zero deployments. Inherited account domain www.italomlp.dev, HTTPS enforcement failed because certificate does not exist yet. Owner checks provisioning/HTTPS before distributing. No global domain changes.
 - User has no Play credentials and requested artifacts + guidance. No Play upload occurred. First-release guide now complete and independently re-reviewed PASS; docs/releases/alpha-handoff.md contains precise owner steps, links, key backup, toolchain paths and resume instructions.
 - Next action: independent final mobile review and remaining signed-device QA; update/rebuild/re-sign only if necessary. Then owner-only web workflow, Play setup/rollout, optional GitHub Publish.
+
+### Resume after account limit reset
+- User requested all agent-side review/QA completed before owner-only handoff. Independent final reviewer resumed and approved spec + code quality/security with no actionable findings. Independent targeted run: 19 tests in 5 files pass. Report preserved .release-artifacts/0.1.0-alpha.1/omnibox-final-review.md.
+- Signed-device QA worker resumed against unchanged release SHA1df7b04328d7756e01a9834b49eb1a9f57b76266; results pending. Do not rebuild or replace signed bytes unless fixes are needed.
+- Hosting investigation: https://italomlp.github.io/omnibox-ai/ redirects301 to http://www.italomlp.dev/omnibox-ai/. HTTPS on www is valid but served by Vercel, redirects to /en/omnibox-ai and404. This is an inherited account Pages custom-domain routing conflict, not merely missing repo TLS certificate. No existing-site/domain settings changed. Prepare precise owner hosting instructions after read-only root Pages inspection.

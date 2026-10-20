@@ -86,6 +86,7 @@ Prepare a draft release for `v0.1.0-alpha.1` targeting the recorded web commit, 
 ## Rollback and recovery
 
 - **Web:** owner reruns the manual workflow from `main` using a previously verified full SHA in main history that contains the release checks. This rebuilds/deploys that source. If a dependency/service change makes rebuilding impossible, preserve the failure logs and prepare a reviewed corrective commit; do not silently deploy an untested substitute. Local IndexedDB/localStorage is not rolled back by deploying older code, so check schema compatibility and back up important records first.
+- **First web release with no known-good predecessor:** owner disables the Pages site in repository Settings if it must be withdrawn, then prepares and verifies a corrective candidate before publishing again. Preserve the repository and release evidence.
 - **Play draft:** owner discards or replaces the unpublished draft in Console. **Active track:** owner stops/halts the affected rollout where Console allows it, then supplies a corrected signed bundle with a higher version code. Do not expect a lower version code to install over a newer one. Preserve signing identity.
 - **GitHub:** owner edits or withdraws incorrect release materials; record replaced artifact hashes. Removing a release or changing notes does not undo an installed app or a Pages deployment.
 - Record what changed, old/new source SHAs, version codes, artifact digests, and follow-up test results in the incident/release evidence. Never delete local user data as an automatic rollback step.

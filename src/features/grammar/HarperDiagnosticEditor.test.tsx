@@ -1,6 +1,7 @@
+import { dismissNativeOverlay } from '../../platform/nativeLifecycle'
 import { describe, expect, it, vi } from 'vitest'
 import * as ReactDOMServer from 'react-dom/server'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 
 import { HarperDiagnosticEditor } from './HarperDiagnosticEditor'
 import { buildDiagnosticSegments } from './harperDiagnosticSegments'
@@ -277,6 +278,17 @@ describe('HarperDiagnosticEditor', () => {
       within(actions).getByRole('button', { name: 'Ignore' }),
     )
     expect(within(actions).getByRole('group', { name: 'Apply suggestions for issue 1' })).toHaveTextContent('Apply')
+  })
+
+  it('dismisses an active grammar popover through Android Back before navigation', () => {
+    render(<HarperDiagnosticEditor value="It dont work." diagnostics={[diagnostic]} onChange={vi.fn()} />)
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    textarea.focus()
+    textarea.setSelectionRange(3, 7)
+    fireEvent.select(textarea)
+    expect(screen.getByLabelText('Active grammar issue')).toBeInTheDocument()
+    act(() => { expect(dismissNativeOverlay(document)).toBe(true) })
+    expect(screen.queryByLabelText('Active grammar issue')).not.toBeInTheDocument()
   })
 
   it('keeps contextual issue details dismissed after Escape until a new selection activation', () => {

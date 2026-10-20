@@ -1,3 +1,4 @@
+import { ANDROID_LOCAL_INFERENCE_NOTE, isNativeAndroid } from '../../platform/runtime'
 import React from 'react'
 import { useSettingsStore, type LocalQualityPolicy } from '../../store/useSettingsStore'
 import {
@@ -54,6 +55,10 @@ export const SettingsPanel: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-4 sm:space-y-6">
+      {isNativeAndroid() && <div className="surface-nested rounded-xl p-4 text-sm theme-text-muted">
+        <p>Android alpha: API keys stay in memory for this app session and are discarded on process restart. Previously saved keys are removed; documents and runs stay on this device.</p>
+        <p className="mt-2">{ANDROID_LOCAL_INFERENCE_NOTE} Automatic provider fallback is disabled.</p>
+      </div>}
       {/* Privacy Mode Banner */}
       <div className={`privacy-banner surface-nested min-w-0 rounded-xl p-3 transition-colors duration-300 sm:p-4 ${
         privacyMode ? 'status-pill-success shadow-[0_0_15px_-3px_rgba(16,185,129,0.15)]' : 'theme-panel-muted'
@@ -76,7 +81,7 @@ export const SettingsPanel: React.FC = () => {
               </label>
             </div>
             <p className="text-xs leading-relaxed theme-text-muted">
-              When enabled, OmniBox AI cuts off all cloud gateway requests. All utilities are forced to execute locally inside your browser sandbox using WebGPU (WebLLM) or localhost Ollama.
+              {isNativeAndroid() ? 'Privacy mode blocks all cloud AI. Only bundled grammar, regex, and document parsing are available in the Android alpha.' : 'When enabled, OmniBox AI cuts off all cloud gateway requests. All utilities are forced to execute locally inside your browser sandbox using WebGPU (WebLLM) or localhost Ollama.'}
             </p>
           </div>
         </div>
@@ -94,6 +99,7 @@ export const SettingsPanel: React.FC = () => {
             </label>
             <select
               id="local-quality-policy"
+              disabled={isNativeAndroid()}
               value={localQualityPolicy}
               onChange={(e) => setLocalQualityPolicy(e.target.value as LocalQualityPolicy)}
               className="glass-input control-touch w-full rounded-lg px-3 text-xs"
@@ -111,6 +117,7 @@ export const SettingsPanel: React.FC = () => {
           <label className="flex min-w-0 items-start gap-3 rounded-lg theme-panel-muted p-3 text-sm">
             <input
               type="checkbox"
+              disabled={isNativeAndroid()}
               checked={allowLocalModelEscalation}
               onChange={(e) => setAllowLocalModelEscalation(e.target.checked)}
               className="mt-0.5 h-4 w-4 rounded border-[color:var(--app-border)] bg-[color:var(--app-canvas)] text-[color:var(--app-accent)] focus:ring-[color:var(--app-accent)]"
@@ -128,10 +135,10 @@ export const SettingsPanel: React.FC = () => {
           }`}>
             <input
               type="checkbox"
-              checked={allowCloudFallback}
+              disabled={isNativeAndroid() || privacyMode}
+              checked={isNativeAndroid() ? false : allowCloudFallback}
               onChange={(e) => setAllowCloudFallback(e.target.checked)}
-              disabled={privacyMode}
-              aria-disabled={privacyMode}
+              aria-disabled={isNativeAndroid() || privacyMode}
               className="mt-0.5 h-4 w-4 rounded border-[color:var(--app-border)] bg-[color:var(--app-canvas)] text-[color:var(--app-accent)] focus:ring-[color:var(--app-accent)] disabled:cursor-not-allowed"
             />
             <span className="min-w-0 space-y-1">
@@ -146,6 +153,7 @@ export const SettingsPanel: React.FC = () => {
           <label className="flex min-w-0 items-start gap-3 rounded-lg theme-panel-muted p-3 text-sm">
             <input
               type="checkbox"
+              disabled={isNativeAndroid()}
               checked={showRawModelDiagnostics}
               onChange={(e) => setShowRawModelDiagnostics(e.target.checked)}
               className="mt-0.5 h-4 w-4 rounded border-[color:var(--app-border)] bg-[color:var(--app-canvas)] text-[color:var(--app-accent)] focus:ring-[color:var(--app-accent)]"
@@ -166,7 +174,7 @@ export const SettingsPanel: React.FC = () => {
         </h2>
 
         <div className="grid min-w-0 gap-3 sm:gap-4">
-          {providers.map((p) => {
+          {providers.filter((provider) => !isNativeAndroid() || (provider.id !== 'webgpu' && provider.id !== 'ollama')).map((p) => {
             const isOllama = p.id === 'ollama'
             const isWebGPU = p.id === 'webgpu'
             const isCloud = !isOllama && !isWebGPU

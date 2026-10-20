@@ -1,3 +1,6 @@
+import { SystemBars, SystemBarsStyle } from '@capacitor/core'
+import { isNativeAndroid } from './platform/runtime'
+import { dismissNativeOverlay, installAndroidLifecycle } from './platform/nativeLifecycle'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSettingsStore } from './store/useSettingsStore'
 import { useUIStore } from './store/useUIStore'
@@ -24,7 +27,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const hasGPU = 'gpu' in navigator && navigator.gpu !== undefined
+      const hasGPU = !isNativeAndroid() && 'gpu' in navigator && navigator.gpu !== undefined
       setWebGpuSupported(hasGPU)
     }
   }, [])
@@ -58,6 +61,9 @@ const App: React.FC = () => {
     if (typeof window !== 'undefined') {
       const root = window.document.documentElement
       root.classList.toggle('light', ui.theme === 'light')
+      if (isNativeAndroid()) {
+        void SystemBars.setStyle({ style: ui.theme === 'light' ? SystemBarsStyle.Light : SystemBarsStyle.Dark })
+      }
     }
   }, [ui.theme])
 
@@ -93,12 +99,27 @@ const App: React.FC = () => {
     setIsCommandPaletteOpen(false)
   }, [])
 
+  useEffect(() => installAndroidLifecycle({
+    closePalette: () => {
+      if (!isCommandPaletteOpen) return false
+      setIsCommandPaletteOpen(false)
+      return true
+    },
+    closeSidebar: () => {
+      if (!ui.sidebarOpen || !isMobileViewport) return false
+      ui.toggleSidebar()
+      return true
+    },
+    dismissOverlay: () => dismissNativeOverlay(document),
+    goBack: () => window.history.back(),
+  }), [isCommandPaletteOpen, isMobileViewport, ui])
+
   const routeTitle = getRouteTitle(ui.route)
   const routeSubtitle = getRouteSubtitle(ui.route)
   const isDrawerOpen = ui.sidebarOpen && isMobileViewport
 
   return (
-    <div className="app-main-layout theme-shell flex min-h-screen overflow-x-clip antialiased font-sans">
+    <div className={`${isNativeAndroid() ? 'native-android ' : ''}app-main-layout theme-shell flex min-h-screen overflow-x-clip antialiased font-sans`}>
       <AppSidebar
         route={ui.route}
         sidebarOpen={ui.sidebarOpen}

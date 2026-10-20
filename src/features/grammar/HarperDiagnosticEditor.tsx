@@ -294,6 +294,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
             ref={popoverRef}
             role="region"
             aria-label="Active grammar issue"
+            data-native-back-target={textareaId}
             data-placement={popoverPosition?.placement ?? 'fallback'}
             className="harper-diagnostic-popover layer-popover40"
             style={{

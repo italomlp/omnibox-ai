@@ -1,3 +1,5 @@
+import { isNativeAndroid } from '../platform/runtime'
+import { registerActiveInference } from '../platform/nativeLifecycle'
 import { useState, useEffect, useRef } from 'react'
 import { useSettingsStore } from '../store/useSettingsStore'
 import {
@@ -296,7 +298,7 @@ export function useInference(): UseInferenceReturn {
     privacyMode,
   } = settings
 
-  const [activeProvider, setActiveProvider] = useState<ProviderId>('webgpu')
+  const [activeProvider, setActiveProvider] = useState<ProviderId>(() => isNativeAndroid() ? 'openai' : 'webgpu')
   const [selectedModel, setSelectedModelState] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -313,13 +315,16 @@ export function useInference(): UseInferenceReturn {
 
   // Ensure WebGPU is always available as Tier 1 if privacy mode is off,
   // or limit to local options if privacy mode is on.
-  const providersToUse: ProviderId[] = privacyMode
+  const browserProviders: ProviderId[] = privacyMode
     ? ['webgpu', 'ollama']
     : ['webgpu', ...availableProviders]
+  const providersToUse = isNativeAndroid()
+    ? browserProviders.filter((provider) => provider !== 'webgpu' && provider !== 'ollama')
+    : browserProviders
 
   // Enforce privacy mode constraints on the active provider
   useEffect(() => {
-    if (privacyMode && activeProvider !== 'webgpu' && activeProvider !== 'ollama') {
+    if (!isNativeAndroid() && privacyMode && activeProvider !== 'webgpu' && activeProvider !== 'ollama') {
       setActiveProvider('webgpu')
     }
   }, [privacyMode, activeProvider])
@@ -343,7 +348,6 @@ export function useInference(): UseInferenceReturn {
   const abort = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
-      abortControllerRef.current = null
     }
   }
 
@@ -641,6 +645,7 @@ export function useInference(): UseInferenceReturn {
         throw primaryError
       }
 
+      if (isNativeAndroid()) throw primaryError
       const latestSettings = readDispatchSettings()
 
       if (activeProvider === 'webgpu') {
@@ -715,6 +720,11 @@ export function useInference(): UseInferenceReturn {
     const controller = new AbortController()
     abortControllerRef.current = controller
 
+    let cancelRun: (() => Promise<void>) | undefined
+    const unregister = isNativeAndroid()
+      ? registerActiveInference(controller, async () => { await cancelRun?.() })
+      : () => undefined
+
     const dispatchSettings = readDispatchSettings()
     const executionModelId = activeProvider === 'webgpu'
       ? dispatchSettings.selectedModels.webgpu || selectedModel || PROVIDER_DEFAULT_MODELS.webgpu
@@ -751,9 +761,12 @@ export function useInference(): UseInferenceReturn {
       execution: initialExecution,
     })
 
+    cancelRun = () => runTracker.cancel()
     await runTracker.markRunning(initialExecution)
 
     try {
+      if (controller.signal.aborted) throw makeAbortError()
+      ensurePolicyAllows(activeProvider)
       if (isStructuredRunInferenceOptions(opts)) {
         const finalText = await runStructuredInference(opts, controller, runTracker)
         if (controller.signal.aborted) throw makeAbortError()
@@ -822,6 +835,7 @@ export function useInference(): UseInferenceReturn {
         message,
       })
     } finally {
+      unregister()
       if (abortControllerRef.current === controller) {
         setIsProcessing(false)
         abortControllerRef.current = null

@@ -1,3 +1,5 @@
+import { ANDROID_SPEECH_NOTE, isNativeAndroid } from './runtime'
+
 type SpeechRecognitionErrorType =
   | 'aborted'
   | 'audio-capture'
@@ -133,12 +135,18 @@ const formatRecognitionError = (error: BrowserSpeechRecognitionErrorEvent['error
 }
 
 const getSpeechSynthesis = (): SpeechSynthesis | null => {
-  if (typeof window === 'undefined') return null
+  if (isNativeAndroid() || typeof window === 'undefined') return null
   if (!('speechSynthesis' in window)) return null
   return window.speechSynthesis
 }
 
 export const getBrowserSpeechCapabilities = (privacyMode: boolean): BrowserSpeechCapabilities => {
+  if (isNativeAndroid()) {
+    return {
+      synthesis: { supported: false, browserDependent: false, note: ANDROID_SPEECH_NOTE },
+      recognition: { supported: false, privacyBlocked: false, verifiedLocalOnly: false, note: ANDROID_SPEECH_NOTE },
+    }
+  }
   const synthesisSupported = Boolean(getSpeechSynthesis())
   const recognitionSupported = Boolean(getBrowserSpeechRecognitionConstructor())
 
@@ -158,7 +166,7 @@ export const getBrowserSpeechCapabilities = (privacyMode: boolean): BrowserSpeec
 }
 
 export const getBrowserSpeechRecognitionConstructor = (): BrowserSpeechRecognitionConstructor | null => {
-  if (typeof window === 'undefined') return null
+  if (isNativeAndroid() || typeof window === 'undefined') return null
 
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null
 }
@@ -229,6 +237,7 @@ export const stopBrowserSpeech = (): void => {
 }
 
 export const requestBrowserMicrophonePermission = async (): Promise<MicrophonePermissionState> => {
+  if (isNativeAndroid()) return 'denied'
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     return 'unknown'
   }
@@ -247,6 +256,7 @@ export const requestBrowserMicrophonePermission = async (): Promise<MicrophonePe
 }
 
 export const readBrowserMicrophonePermission = async (): Promise<MicrophonePermissionState> => {
+  if (isNativeAndroid()) return 'denied'
   if (typeof navigator === 'undefined' || !navigator.permissions?.query) {
     return 'unknown'
   }

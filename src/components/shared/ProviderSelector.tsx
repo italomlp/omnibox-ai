@@ -1,3 +1,4 @@
+import { ANDROID_LOCAL_INFERENCE_NOTE, isNativeAndroid, getProviderUnavailableReason } from '../../platform/runtime'
 import React from 'react'
 import { PROVIDER_MODELS_LIST } from '../../config/providers'
 import type { ProviderId } from '../../config/providers'
@@ -23,12 +24,13 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       <div className="flex min-w-0 flex-col gap-1 sm:w-auto">
         <label className="text-[10px] theme-text-faint font-semibold uppercase">Provider</label>
         <select
+          disabled={availableProviders.length === 0}
           value={activeProvider}
           onChange={(e) => onProviderChange(e.target.value as ProviderId)}
           className="control-standard model-control min-w-0 h-9 w-full cursor-pointer rounded-md px-3 text-xs sm:w-56"
         >
           {availableProviders.map((prov) => (
-            <option key={prov} value={prov}>
+            <option key={prov} value={prov} disabled={Boolean(getProviderUnavailableReason(prov))}>
               {prov === 'webgpu'
                 ? 'Tier 1: WebGPU (Local)'
                 : prov === 'ollama'
@@ -70,6 +72,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
           </select>
         )}
       </div>
+      {isNativeAndroid() && <p className="w-full text-xs theme-text-muted">{availableProviders.length === 0 ? 'Privacy mode blocks cloud AI. ' : ''}{ANDROID_LOCAL_INFERENCE_NOTE}</p>}
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { ANDROID_SPEECH_NOTE, isNativeAndroid } from '../../platform/runtime'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Bot, CheckCircle2, Loader2, Mic, MicOff, Pause, Play, RotateCcw, Sparkles, Square, Volume2 } from 'lucide-react'
 import { ErrorAlert } from '../../components/shared/ErrorAlert'
@@ -64,12 +65,12 @@ export const SpeechStudioToolPage: React.FC = () => {
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('')
   const [speechText, setSpeechText] = useState('')
   const [speechPlaybackState, setSpeechPlaybackState] = useState<SpeechPlaybackState>('idle')
-  const [speechStatus, setSpeechStatus] = useState('Enter text to preview browser speech synthesis.')
+  const [speechStatus, setSpeechStatus] = useState(isNativeAndroid() ? ANDROID_SPEECH_NOTE : 'Enter text to preview browser speech synthesis.')
   const [speechError, setSpeechError] = useState('')
 
   const [microphonePermission, setMicrophonePermission] = useState<MicrophonePermissionState>('unknown')
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle')
-  const [recognitionStatus, setRecognitionStatus] = useState('Browser speech recognition is available when the browser supports it.')
+  const [recognitionStatus, setRecognitionStatus] = useState(isNativeAndroid() ? ANDROID_SPEECH_NOTE : 'Browser speech recognition is available when the browser supports it.')
   const [recognitionError, setRecognitionError] = useState('')
   const [finalTranscript, setFinalTranscript] = useState('')
   const [interimTranscript, setInterimTranscript] = useState('')
@@ -617,7 +618,7 @@ export const SpeechStudioToolPage: React.FC = () => {
               <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Microphone</div>
                 <div className="mt-1 text-sm font-medium text-zinc-100">{microphonePermission}</div>
-                <p className="mt-1 text-xs leading-6 text-zinc-400">Permission is requested explicitly before listening starts.</p>
+                <p className="mt-1 text-xs leading-6 text-zinc-400">{isNativeAndroid() ? 'Microphone access is disabled in the Android alpha.' : 'Permission is requested explicitly before listening starts.'}</p>
               </div>
             </div>
 

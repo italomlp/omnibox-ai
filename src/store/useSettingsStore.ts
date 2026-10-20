@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { isNativeAndroid } from '../platform/runtime'
 import type { ProviderId } from '../config/providers'
 import { PROVIDER_DEFAULT_URLS, PROVIDER_DEFAULT_MODELS } from '../config/providers'
 
@@ -77,6 +78,29 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'omnibox-settings-v1',
+      storage: createJSONStorage(() => ({
+        getItem: (name) => {
+          const raw = localStorage.getItem(name)
+          if (!raw || !isNativeAndroid()) return raw
+          try {
+            const value = JSON.parse(raw)
+            if (value.state?.apiKeys) {
+              delete value.state.apiKeys
+              const sanitized = JSON.stringify(value)
+              localStorage.setItem(name, sanitized)
+              return sanitized
+            }
+          } catch { /* Zustand handles invalid persisted JSON. */ }
+          return raw
+        },
+        setItem: (name, value) => localStorage.setItem(name, value),
+        removeItem: (name) => localStorage.removeItem(name),
+      })),
+      partialize: (state) => {
+        if (!isNativeAndroid()) return state
+        const { apiKeys: _apiKeys, ...preferences } = state
+        return preferences
+      },
       merge: (persistedState, currentState) => {
         const nextState = {
           ...currentState,
@@ -85,6 +109,7 @@ export const useSettingsStore = create<SettingsState>()(
 
         return {
           ...nextState,
+          apiKeys: isNativeAndroid() ? currentState.apiKeys : nextState.apiKeys,
           allowCloudFallback: nextState.privacyMode ? false : nextState.allowCloudFallback,
         }
       },

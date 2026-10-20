@@ -1,3 +1,4 @@
+import { isNativeAndroid } from '../../platform/runtime'
 import React, { useMemo, useState } from 'react'
 import { Search, Sparkles } from 'lucide-react'
 import type { RouteDescriptor } from '../../navigation'
@@ -131,6 +132,7 @@ export const ToolsCatalogPage: React.FC<ToolsCatalogPageProps> = ({ onNavigate }
                         {tool.title}
                       </div>
                       <p className="text-sm leading-6 text-zinc-400">{tool.description}</p>
+                      {isNativeAndroid() && <p className="text-xs text-amber-300">{tool.id === 'speech-studio' ? 'Speech is disabled in the Android alpha. No microphone permission.' : tool.id === 'grammar-tone' || tool.id === 'regex-interpreter' ? 'Bundled local checking available. AI actions need a session cloud key with privacy mode off.' : 'AI actions need a session cloud key with privacy mode off. WebLLM and Ollama are disabled.'}</p>}
                     </div>
 
                     <span className="shrink-0 rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
@@ -139,7 +141,7 @@ export const ToolsCatalogPage: React.FC<ToolsCatalogPageProps> = ({ onNavigate }
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-                    {tool.capabilities.supportsLocalExecution ? <span className="rounded-full border border-emerald-900/40 bg-emerald-950/20 px-2 py-1 text-emerald-300">Local</span> : null}
+                    {tool.capabilities.supportsLocalExecution && (!isNativeAndroid() || tool.id === 'grammar-tone' || tool.id === 'regex-interpreter') ? <span className="rounded-full border border-emerald-900/40 bg-emerald-950/20 px-2 py-1 text-emerald-300">Local</span> : null}
                     {tool.capabilities.supportsCloudExecution ? <span className="rounded-full border border-indigo-900/40 bg-indigo-950/20 px-2 py-1 text-indigo-300">Cloud</span> : null}
                     {tool.capabilities.supportsStreaming ? <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-300">Streaming</span> : null}
                     {tool.capabilities.supportsArtifacts ? <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-300">Artifacts</span> : null}

@@ -1068,3 +1068,16 @@ html.light code {
   background-color: rgba(9, 9, 11, 0.05) !important;
   color: #4f46e5 !important;
 }
+
+/* Capacitor SystemBars supplies safe-area insets and resizes the WebView for IME. */
+.native-android.app-main-layout {
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+.native-android .app-sidebar {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.native-android [role="dialog"][aria-modal="true"] {
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2rem);
+}

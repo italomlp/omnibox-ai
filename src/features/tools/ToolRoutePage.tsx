@@ -2,9 +2,15 @@ import React, { Suspense, lazy } from 'react'
 import { ArrowLeft, ArrowUpRight, Loader2, Sparkles } from 'lucide-react'
 import type { RouteDescriptor } from '../../navigation'
 import type { ToolId } from '../../tools/types'
-import { CareerWorkspace } from '../career/CareerWorkspace'
-import { GrammarWorkspace } from '../grammar/GrammarWorkspace'
 import { getToolMetadata } from './toolNavigation'
+
+const GrammarWorkspace = lazy(() =>
+  import('../grammar/GrammarWorkspace').then((module) => ({ default: module.GrammarWorkspace })),
+)
+
+const CareerWorkspace = lazy(() =>
+  import('../career/CareerWorkspace').then((module) => ({ default: module.CareerWorkspace })),
+)
 
 const TypeJsdocToolPage = lazy(() =>
   import('../type-jsdoc/TypeJsdocToolPage').then((module) => ({ default: module.TypeJsdocToolPage })),
@@ -37,8 +43,12 @@ interface ToolRoutePageProps {
 }
 
 export const ToolRoutePage: React.FC<ToolRoutePageProps> = ({ toolId, onNavigate }) => {
-  if (toolId === 'grammar-tone') return <GrammarWorkspace />
-  if (toolId === 'career') return <CareerWorkspace />
+  if (toolId === 'grammar-tone') {
+    return <Suspense fallback={<ToolLoadingState />}><GrammarWorkspace /></Suspense>
+  }
+  if (toolId === 'career') {
+    return <Suspense fallback={<ToolLoadingState />}><CareerWorkspace /></Suspense>
+  }
 
   if (toolId === 'type-jsdoc') {
     return (

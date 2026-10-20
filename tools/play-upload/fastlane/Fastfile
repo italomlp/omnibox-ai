@@ -1,0 +1,35 @@
+default_platform(:android)
+
+platform :android do
+  desc 'Upload an already-reviewed AAB as an internal draft; never roll out'
+  lane :upload_internal_draft do
+    key_setting = ENV.fetch('OMNIBOX_PLAY_JSON_KEY', '')
+    aab_setting = ENV.fetch('OMNIBOX_PLAY_AAB', '')
+    UI.user_error!('Set OMNIBOX_PLAY_JSON_KEY to an external service-account JSON path') if key_setting.empty?
+    UI.user_error!('Set OMNIBOX_PLAY_AAB to the reviewed signed AAB path') if aab_setting.empty?
+
+    UI.user_error!('Service-account JSON must be a readable file') unless File.file?(key_setting) && File.readable?(key_setting)
+    UI.user_error!('AAB must be a readable .aab file') unless File.file?(aab_setting) && File.readable?(aab_setting) && File.extname(aab_setting).downcase == '.aab'
+
+    key_path = File.realpath(key_setting)
+    checkout_path = File.realpath(File.join(__dir__, '../../..'))
+    if key_path == checkout_path || key_path.start_with?(checkout_path + File::SEPARATOR)
+      UI.user_error!('Keep the service-account key outside the repository checkout')
+    end
+
+    upload_to_play_store(
+      package_name: 'com.italomlp.omniboxai',
+      json_key: key_path,
+      aab: File.realpath(aab_setting),
+      track: 'internal',
+      release_status: 'draft',
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      changes_not_sent_for_review: true,
+      rescue_changes_not_sent_for_review: false
+    )
+  end
+end

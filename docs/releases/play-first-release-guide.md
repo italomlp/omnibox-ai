@@ -104,3 +104,5 @@ Review the exact bundle, notes, tester list, signing details, warnings, required
 - Verify the public privacy URL after your manual Pages publish before submitting it as a hosted policy.
 - Confirm the actual signed artifact, fingerprint, source hashes, device results, Ruby/Bundler setup, and dependency lockfile using the release evidence; do not treat this guide as their validation.
 - Live inference remains **NOT LIVE-VERIFIED** unless a later report records an actual response. Final review/rollout and publication remain yours.
+
+Before using the Pages website/privacy URLs, resolve the known account-site redirect using [the web publication guide](web-first-release-guide.md); the current inherited path reaches a Vercel404 and is not a published privacy policy.

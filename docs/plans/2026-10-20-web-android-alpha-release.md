@@ -13,7 +13,7 @@
 
 ## Tasks, owners and acceptance
 - [x] 0 Primary: Save durable plan before implementation.
-- [ ] 1 Primary: Recheck GitHub repo; create public italomlp/omnibox-ai if absent. Preserve git history and existing dirty changes; explicitly stage only intended files using core.filemode=false per command. Exclude AppleDouble sidecars, .tmp, dist, node_modules and signing secrets. Create codex/web-alpha; commit repaired lockfile and prior validation docs with plan. Create isolated agent worktrees. Record paths and SHAs.
+- [x] 1 Primary: Recheck GitHub repo; create public italomlp/omnibox-ai if absent. Preserve git history and existing dirty changes; explicitly stage only intended files using core.filemode=false per command. Exclude AppleDouble sidecars, .tmp, dist, node_modules and signing secrets. Create codex/web-alpha; commit repaired lockfile and prior validation docs with plan. Create isolated agent worktrees. Record paths and SHAs.
 - [ ] 2 Web subagent: Shared early-alpha badge, feedback/limitations, strict TypeScript, true lazy loading for WebLLM and heavyweight workspaces, Pages subpath navigation. Fix rather than suppress lint or strict failures. Preserve privacy hard boundary and bundled parsers. Run targeted tests first for behavior, then lint/full tests/build.
 - [ ] 3 Release subagent: CI npm ci → lint → tests → build; manual-only Pages deployment with full SHA input; static privacy page accurately disclosing local data, user-selected cloud requests, web credential storage and speech limitations. Release notes, reproducible artifact manifest tooling, README and rollback/runbook. Never trigger deployment. Primary owns package.json/lockfile integration.
 - [ ] 4 Primary: Review and integrate shared/web changes; version package 0.1.0-alpha.1, reconcile lockfile. Commit shared checkpoint. Create codex/mobile-alpha worktree FROM SHARED CHECKPOINT before Android implementation. Android agent can inspect/plan earlier, but must not scaffold before checkpoint.
@@ -52,3 +52,16 @@
 - GitHub gh auth works with network-enabled execution. No origin configured. Repo returned 404 during planning; public creation authorized. SDK /home/italo/Android/Sdk exists; system Java 17. ADB listener requires network-enabled execution; emulator not yet verified.
 - Branches/worktrees/commits/PRs/runs/artifacts/signing fingerprint: append after creation, never invent values.
 - Next action: establish web branch and baseline commit, then native managed worktrees and delegate workers.
+
+### Execution checkpoint 1
+- Repository created: https://github.com/italomlp/omnibox-ai (public). Origin configured. Baseline and web branch push underway. Plan/lock/docs checkpoint 892efc96f53c2c5bcad1dd2c50e75d4081b45815.
+- Web worker /root/web_readiness: /home/italo/.codex/worktrees/alpha-web-readiness/omnibox-ai. Release worker /root/release_preparation: /home/italo/.codex/worktrees/alpha-release-preparation/omnibox-ai. Android worker /root/android_packaging: /home/italo/.codex/worktrees/alpha-android/omnibox-ai (tooling only until shared checkpoint).
+- Worker briefs/reports: /tmp/omnibox-{web,release,android}-{brief,report}.md. Reports written on completion.
+- Next: integrate web/release commits, send shared checkpoint to Android worker; finish private signing and Play draft preparation.
+
+### Execution checkpoint 2
+- GitHub main and codex/web-alpha pushed. Public repository https://github.com/italomlp/omnibox-ai.
+- Private signing key generated at /home/italo/.local/share/omnibox-ai/signing/upload-keystore.p12 (alias omnibox-upload). SHA256 certificate DC:41:CB:70:D2:C4:D7:9A:3B:85:EE:02:1B:29:1C:F0:1C:07:69:C2:48:AE:A0:0D:40:3D:02:95:30:79:DA:3A. Back up the complete signing directory privately; never commit/upload credentials.
+- Compatible npm audit fix removed all high-severity findings, including malicious-PDF advisory. Remaining three moderate findings are Mammoth's Node CLI argparse/sprintf-js dependency chain; do not force downgrade Mammoth to 0.3.29. Verify browser bundle reachability and document residual.
+- Play Console browser navigation blocked by automatic approval: intended play.google.com resolved to unapproved google.play origin. User asked about CLI; Fastlane draft lane being prepared. No service-account key provided and new app/initial build require Console. DO NOT retry blocked origin or alternative browser to circumvent review. Await explicit origin authorization or user's Console setup.
+- Android SDK36 prepared; API37 emulator booted by Android worker. Web worker reports 76 tests, strict build, 401KB main entry with deferred WebLLM large-chunk warning retained. Review pending.

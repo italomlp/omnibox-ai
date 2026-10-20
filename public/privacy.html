@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
+    <meta name="description" content="How OmniBox AI alpha handles local records, provider requests and privacy controls.">
+    <title>Privacy — OmniBox AI</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; color: #e4e4e7; background: #09090b; line-height: 1.7; }
+      body { max-width: 52rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; overflow-wrap: anywhere; }
+      h1, h2 { line-height: 1.25; color: #fafafa; }
+      h1 { font-size: clamp(2rem, 6vw, 3rem); }
+      h2 { margin-top: 2rem; }
+      a { color: #a5b4fc; text-underline-offset: .2em; }
+      a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+      .meta { color: #a1a1aa; }
+      .notice { border: 1px solid #52525b; border-radius: .75rem; padding: 1rem; background: #18181b; }
+      code { font-family: ui-monospace, monospace; }
+      @media (prefers-color-scheme: light) {
+        :root { color: #27272a; background: #fafafa; }
+        h1, h2 { color: #18181b; }
+        a { color: #3730a3; }
+        .meta { color: #52525b; }
+        .notice { background: #f4f4f5; border-color: #a1a1aa; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav aria-label="Back"><a href="./">← OmniBox AI</a></nav>
+    <main>
+      <h1>Privacy</h1>
+      <p class="meta">OmniBox AI · 0.1.0-alpha.1 · Updated October 20, 2026</p>
+      <p>OmniBox AI is a client-side productivity app. Its web interface runs in your browser; the Android alpha packages the interface on your device. There is no OmniBox AI account or application backend receiving your workspace records.</p>
+      <h2>Records stored on your device</h2>
+      <p>The app uses IndexedDB (the <code>OmniBoxDB</code> database) to keep imported or pasted document text, run inputs and outputs, generated artifacts, provider and model identifiers, timestamps, errors, and legacy history. These records can contain personal or sensitive information you choose to enter. Settings and some temporary reload inputs are stored in localStorage.</p>
+      <p>In the web app, the provider API keys you enter are saved in localStorage under the app's browser origin, together with preferences. They are not encrypted by the app. Other people or software with access to that browser profile may be able to read them. Use a private device, restrict provider keys where possible, and remove keys in Settings when finished.</p>
+      <p>In the Android alpha, API keys are kept in memory for the current app session rather than persisted by the app. You need to enter them again after the app process restarts. Other workspace records still use device-local web storage; this is not a secure vault or a guaranteed backup.</p>
+      <h2>Requests to providers you select</h2>
+      <p>If you select a cloud provider or allow cloud fallback, the app sends the input needed for that task (which may include document text and context), your selected model, and your API credential directly to the configured provider endpoint. The default cloud endpoints use HTTPS; if you configure a custom endpoint, verify its security and operator before using it. Available provider routes include OpenAI, Google Gemini, OpenRouter, and Anthropic-compatible endpoints. A custom endpoint or proxy you configure also receives these requests. Each recipient applies its own retention, processing, billing, and privacy terms; review those terms before sending sensitive content.</p>
+      <p>Web Ollama connects to the local endpoint you configure. A custom remote URL is not guaranteed to stay on your device. Browser CORS and HTTPS mixed-content rules can block access to a local server.</p>
+      <h2>Privacy Mode and local models</h2>
+      <p>Privacy Mode blocks the app's cloud inference routes and cloud fallback. Browser speech recognition is disabled in Privacy Mode because it is not verified to run locally. The setting does not erase existing records, revoke provider keys, or undo requests already sent.</p>
+      <p>WebLLM inference runs locally using WebGPU on supported web browsers. Loading an uncached model requires an explicit model load or download action and network downloads of model weights and runtime assets from the model hosts. Model downloads are separate from sending your task inputs to a cloud inference provider. Cached models may use substantial device storage. Clear browser site data and model caches if you want to remove downloaded assets.</p>
+      <p>The app does not embed analytics, advertising, third-party fonts, or CDN scripts. Loading the hosted site still contacts its hosting provider, which may process normal request information such as IP addresses and user agents. Your browser, operating system, extensions, and configured services may have their own network behavior.</p>
+      <h2>Browser speech</h2>
+      <p>On the web, speech recognition requires your action and microphone permission. Your browser or its vendor may process microphone audio using a network service; OmniBox AI does not verify that recognition stays on your device. Speech synthesis voices and processing depend on your browser and operating system. Transcript cleanup through an AI provider follows the provider and Privacy Mode settings above.</p>
+      <h2>Deleting records</h2>
+      <p>Library and History delete controls remove the records named by each control. Clearing one Library collection does not clear settings or all legacy history. To remove all local app data, use your browser's site-data controls to clear IndexedDB, localStorage, and caches for the app origin; on Android, use the app's storage controls or uninstall it. Deleting local records does not delete information already sent to a provider. Contact that provider about its deletion options.</p>
+      <h2 id="limitations">Alpha limitations</h2>
+      <p class="notice">Live provider inference is <strong>NOT LIVE-VERIFIED</strong> for this release. WebGPU, model downloads, browser speech, CORS, and storage durability vary by browser and device. The Android alpha disables WebLLM/WebGPU, Ollama, and speech features. Android keys are session-only. Store publication and production readiness are not implied by this privacy page.</p>
+      <p>Do not rely on generated output without reviewing it. Keep your own backups of important data. This page describes the intended alpha behavior; report any behavior that differs.</p>
+      <h2>Contact</h2>
+      <p>Privacy and support: <a href="mailto:italomlp@gmail.com">italomlp@gmail.com</a>. Public bug reports: <a href="https://github.com/italomlp/omnibox-ai/issues">GitHub issues</a>. Do not include API keys or sensitive documents in a public issue.</p>
+    </main>
+  </body>
+</html>

@@ -1074,6 +1074,10 @@ html.light code {
   min-height: 100dvh;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
+/* Keep the sticky header below system bars after root padding scrolls away. */
+.native-android .app-header {
+  top: env(safe-area-inset-top, 0px);
+}
 .native-android .app-sidebar {
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);

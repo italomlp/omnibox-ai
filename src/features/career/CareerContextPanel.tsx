@@ -38,12 +38,12 @@ export const CareerContextPanel: React.FC<CareerContextPanelProps> = ({
 }) => (
   <div className="flex min-w-0 flex-col space-y-4">
     <div className="surface-nested space-y-3 rounded-xl border border-zinc-800/40 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
           1. Candidate Resume / CV
         </h3>
 
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:max-w-md sm:flex-none">
+        <div className="flex w-full min-w-0 flex-col gap-2">
           <div className="flex w-full justify-end">
             <label className="button-secondary control-touch w-full cursor-pointer select-none text-[10px] text-indigo-400 hover:text-indigo-300 sm:w-auto">
               <Upload className="w-3 h-3 flex-shrink-0" />

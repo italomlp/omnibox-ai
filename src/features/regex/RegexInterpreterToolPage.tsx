@@ -1,11 +1,10 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Copy, Loader2, RotateCcw, Sparkles, WandSparkles, XCircle } from 'lucide-react'
-import { ErrorAlert } from '../../components/shared/ErrorAlert'
 import { ProviderSelector } from '../../components/shared/ProviderSelector'
-import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
 import { ToolHeader } from '../../components/tooling/ToolHeader'
 import { SplitPane } from '../../components/tooling/SplitPane'
 import { ToolPage } from '../../components/tooling/ToolPage'
+import { InferenceStatus } from '../../components/tooling/InferenceStatus'
 import { useInference } from '../../hooks/useInference'
 
 type RegexMode = 'explain' | 'generate'
@@ -207,11 +206,9 @@ export const RegexInterpreterToolPage: React.FC = () => {
     setSelectedModel,
     availableProviders,
     isProcessing,
-    errorMsg,
     clearError,
     runInference,
     abort,
-    webLLM,
   } = inference
 
   const [mode, setMode] = useState<RegexMode>('explain')
@@ -389,15 +386,7 @@ export const RegexInterpreterToolPage: React.FC = () => {
         }
       />
 
-      <WebGPULoadingOverlay
-        isLoading={activeProvider === 'webgpu' && webLLM.isLoading}
-        selectedModel={selectedModel}
-        loadPercent={webLLM.loadPercent}
-        speed={webLLM.speed}
-        loadProgress={webLLM.loadProgress}
-      />
-
-      <ErrorAlert errorMsg={errorMsg} activeProvider={activeProvider} onDismiss={clearError} />
+      <InferenceStatus inference={inference} />
 
       <SplitPane
         left={

@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Briefcase } from 'lucide-react'
 import { ProviderSelector } from '../../components/shared/ProviderSelector'
-import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
-import { ErrorAlert } from '../../components/shared/ErrorAlert'
 import { ToolHeader } from '../../components/tooling/ToolHeader'
 import { ToolPage } from '../../components/tooling/ToolPage'
+import { InferenceStatus } from '../../components/tooling/InferenceStatus'
 import { SplitPane } from '../../components/tooling/SplitPane'
 import { useInference } from '../../hooks/useInference'
-import { WEBLLM_MODEL_CONFIG_BY_ID } from '../../config/providers'
+import { WEBLLM_MODEL_CONFIG_BY_ID, resolveWebLLMDefault } from '../../config/providers'
+import { useSettingsStore } from '../../store/useSettingsStore'
 import { extractTextFromDocx, extractTextFromPdf } from '../../utils/pdfParser'
 import { getTaskContextBudget } from '../../services/inference'
 import { CareerActionPanel } from './CareerActionPanel'
@@ -40,9 +40,7 @@ export const CareerToolPage: React.FC = () => {
     setSelectedModel,
     availableProviders,
     isProcessing,
-    errorMsg,
     runInference,
-    webLLM,
   } = inference
 
   const [resumeText, setResumeText] = useState('')
@@ -56,7 +54,8 @@ export const CareerToolPage: React.FC = () => {
   const [output, setOutput] = useState('')
   const [gapResult, setGapResult] = useState<CareerGapResult | null>(null)
 
-  const selectedWebLLMConfig = activeProvider === 'webgpu' ? WEBLLM_MODEL_CONFIG_BY_ID[selectedModel] : undefined
+  const webLLMAuto = useSettingsStore((state) => state.webLLMAuto)
+  const selectedWebLLMConfig = activeProvider === 'webgpu' ? WEBLLM_MODEL_CONFIG_BY_ID[resolveWebLLMDefault(webLLMAuto, selectedModel, 'career', 'gap-analysis')] : undefined
 
   const gapAnalysisBudget = useMemo(() => {
     if (!selectedWebLLMConfig) return null
@@ -277,15 +276,7 @@ export const CareerToolPage: React.FC = () => {
         }
       />
 
-      <WebGPULoadingOverlay
-        isLoading={activeProvider === 'webgpu' && webLLM.isLoading}
-        selectedModel={selectedModel}
-        loadPercent={webLLM.loadPercent}
-        speed={webLLM.speed}
-        loadProgress={webLLM.loadProgress}
-      />
-
-      <ErrorAlert errorMsg={errorMsg} activeProvider={activeProvider} onDismiss={inference.clearError} />
+      <InferenceStatus inference={inference} />
 
       <SplitPane
         left={

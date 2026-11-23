@@ -287,7 +287,7 @@ export const HarperDiagnosticEditor: React.FC<HarperDiagnosticEditorProps> = ({
             onScroll?.(event)
           }}
           aria-describedby={`${statusId} ${issueListId}`}
-          className={`harper-diagnostic-textarea glass-input control-touch relative z-10 min-h-[280px] w-full resize-y rounded-lg border-0 bg-transparent p-4 text-sm ${className ?? ''}`}
+          className={`harper-diagnostic-textarea glass-input relative z-10 block min-h-[280px] w-full resize-y rounded-lg border-0 bg-transparent p-4 text-sm ${className ?? ''}`}
         />
         {activeDiagnostic && (
           <div

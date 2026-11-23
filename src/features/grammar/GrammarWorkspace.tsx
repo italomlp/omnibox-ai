@@ -64,7 +64,7 @@ export const GrammarWorkspace: React.FC = () => {
   const skipNextLocalDebounce = React.useRef<{ text: string; revision: number } | null>(null)
 
   React.useEffect(() => {
-    const reload = localStorage.getItem('omnibox-grammar-reload')
+    const reload = window.localStorage?.getItem('omnibox-grammar-reload')
     if (reload) {
       try {
         const parsed = JSON.parse(reload)
@@ -72,7 +72,7 @@ export const GrammarWorkspace: React.FC = () => {
       } catch {
         setInput(reload)
       }
-      localStorage.removeItem('omnibox-grammar-reload')
+      window.localStorage?.removeItem('omnibox-grammar-reload')
     }
   }, [])
 
@@ -368,6 +368,7 @@ export const GrammarWorkspace: React.FC = () => {
         errorMsg={errorMsg}
         activeProvider={activeProvider}
         onDismiss={inference.clearError}
+        onUseOllama={availableProviders.includes('ollama') ? () => { setActiveProvider('ollama'); inference.clearError() } : undefined}
       />
 
       {/* Workspace core layouts */}

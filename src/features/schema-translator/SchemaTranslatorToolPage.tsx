@@ -10,12 +10,11 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
-import { ErrorAlert } from '../../components/shared/ErrorAlert'
 import { ProviderSelector } from '../../components/shared/ProviderSelector'
-import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
 import { SplitPane } from '../../components/tooling/SplitPane'
 import { ToolHeader } from '../../components/tooling/ToolHeader'
 import { ToolPage } from '../../components/tooling/ToolPage'
+import { InferenceStatus } from '../../components/tooling/InferenceStatus'
 import { useInference } from '../../hooks/useInference'
 
 type SchemaFormatId = 'sql-ddl' | 'prisma' | 'zod'
@@ -197,11 +196,9 @@ export const SchemaTranslatorToolPage: React.FC = () => {
     setSelectedModel,
     availableProviders,
     isProcessing,
-    errorMsg,
     runInference,
     abort,
     clearError,
-    webLLM,
   } = inference
 
   const [sourceFormat, setSourceFormat] = useState<SchemaFormatId>('sql-ddl')
@@ -320,15 +317,7 @@ export const SchemaTranslatorToolPage: React.FC = () => {
         )}
       />
 
-      <WebGPULoadingOverlay
-        isLoading={activeProvider === 'webgpu' && webLLM.isLoading}
-        selectedModel={selectedModel}
-        loadPercent={webLLM.loadPercent}
-        speed={webLLM.speed}
-        loadProgress={webLLM.loadProgress}
-      />
-
-      <ErrorAlert errorMsg={errorMsg} activeProvider={activeProvider} onDismiss={clearError} />
+      <InferenceStatus inference={inference} />
 
       <SplitPane
         className="items-start"

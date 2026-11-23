@@ -3,6 +3,8 @@ import { useSettingsStore } from '../store/useSettingsStore'
 import {
   PROVIDER_DEFAULT_MODELS,
   WEBLLM_MODEL_CONFIGS,
+  WEBLLM_TASK_DEFAULTS,
+  resolveWebLLMDefault,
   WEBLLM_MODEL_CONFIG_BY_ID,
   isSupportedWebLLMModel,
   type ProviderId,
@@ -586,12 +588,12 @@ export function useInference(): UseInferenceReturn {
       dispatchSettings.apiKeys,
       activeProvider === 'webgpu' ? undefined : activeProvider,
     )
-    const webLLMModelToUse = dispatchSettings.selectedModels.webgpu || PROVIDER_DEFAULT_MODELS.webgpu
+    const webLLMModelToUse = dispatchSettings.webLLMAuto ? WEBLLM_TASK_DEFAULTS[opts.task] : dispatchSettings.selectedModels.webgpu || PROVIDER_DEFAULT_MODELS.webgpu
     const preferredWebLLMModel = resolveCompatibleWebLLMModel(
       webLLMModelToUse,
       opts.task,
       opts.input,
-      allowLocalEscalation,
+      dispatchSettings.webLLMAuto && allowLocalEscalation,
     )
 
     const tryCurrentProvider = async (): Promise<string> => {
@@ -717,7 +719,7 @@ export function useInference(): UseInferenceReturn {
 
     const dispatchSettings = readDispatchSettings()
     const executionModelId = activeProvider === 'webgpu'
-      ? dispatchSettings.selectedModels.webgpu || selectedModel || PROVIDER_DEFAULT_MODELS.webgpu
+      ? resolveWebLLMDefault(dispatchSettings.webLLMAuto, dispatchSettings.selectedModels.webgpu || selectedModel, opts.toolId, isStructuredRunInferenceOptions(opts) ? opts.task : undefined)
       : dispatchSettings.selectedModels[activeProvider] || selectedModel || PROVIDER_DEFAULT_MODELS[activeProvider]
     const initialExecution = {
       providerId: activeProvider,

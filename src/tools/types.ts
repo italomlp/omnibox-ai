@@ -1,10 +1,6 @@
-export type ToolId =
-  | 'grammar-tone'
-  | 'career'
-  | 'type-jsdoc'
-  | 'schema-translator'
-  | 'regex-interpreter'
-  | 'speech-studio'
+import type { TOOL_CATALOG_DATA } from './catalog'
+
+export type ToolId = (typeof TOOL_CATALOG_DATA)[number]['id']
 
 export type ToolCategoryId = 'writing' | 'career' | 'developer' | 'audio'
 
@@ -35,8 +31,12 @@ export interface ToolArtifactAdapter<TArtifact = unknown, TSummary = string, TDe
 }
 
 export interface ToolDefinition<THistoryRecord = unknown, TArtifact = unknown> {
-  id: ToolId
+  id: string
   version: number
+  enabled: boolean
+  quickStart: boolean
+  legacyWorkspace?: string
+  implementation: { folder: string; entry: string; export: string }
   title: string
   description: string
   categoryId: ToolCategoryId

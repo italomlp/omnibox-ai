@@ -1,4 +1,4 @@
-import { buildRouteUrl, resolveRoute, routesEqual } from './routes'
+import { buildRouteUrl, isRouteDescriptor, resolveRoute, routesEqual, WORKBENCH_ROUTE } from './routes'
 import type { RouteDescriptor, RouteResolution } from './types'
 
 export interface NavigationWindow {
@@ -31,6 +31,7 @@ export const createNavigationController = ({ window, setRoute }: NavigationContr
   }
 
   const writeRoute = (route: RouteDescriptor, method: 'pushState' | 'replaceState') => {
+    route = isRouteDescriptor(route) ? route : WORKBENCH_ROUTE
     const currentUrl = new URL(window.location.href)
     const currentResolution = resolveRoute(currentUrl)
     const targetUrl = buildRouteUrl(route, currentUrl)

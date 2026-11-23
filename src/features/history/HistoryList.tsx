@@ -9,6 +9,7 @@ interface HistoryListProps {
   sortOrder: 'desc' | 'asc';
   onSortChange: (order: 'desc' | 'asc') => void;
   onClearHistory: () => void;
+  clearDisabled?: boolean;
 }
 
 export const HistoryList: React.FC<HistoryListProps> = ({
@@ -19,6 +20,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   sortOrder,
   onSortChange,
   onClearHistory,
+  clearDisabled = false,
 }) => {
   return (
     <div className="surface-nested space-y-4 rounded-xl border border-zinc-800/40 bg-zinc-900/30 p-4">
@@ -54,6 +56,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
 
           <button
             onClick={onClearHistory}
+            disabled={clearDisabled}
             className="button-danger control-standard"
             title="Clear all history entries"
           >

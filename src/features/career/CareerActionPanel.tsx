@@ -53,7 +53,7 @@ export const CareerActionPanel: React.FC<CareerActionPanelProps> = ({ isProcessi
       {gapAnalysisBudget && (
         <div role="status" aria-live="polite" className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${gapAnalysisBudget.fits ? 'border-emerald-900/30 bg-emerald-950/20 text-emerald-300' : 'border-amber-900/30 bg-amber-950/20 text-amber-300'}`}>
           {gapAnalysisBudget.fits ? (
-            <>Selected model fits this gap analysis context budget ({gapAnalysisBudget.estimatedInputTokens}/{gapAnalysisBudget.availableInputTokens} tokens estimated).</>
+            <>Input fits the estimated context budget ({gapAnalysisBudget.estimatedInputTokens}/{gapAnalysisBudget.availableInputTokens} tokens). Check model task support separately.</>
           ) : (
             <>Context budget exceeded by about {gapAnalysisBudget.overflowTokens} tokens for this selected model.</>
           )}

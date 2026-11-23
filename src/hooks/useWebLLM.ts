@@ -103,6 +103,12 @@ export function useWebLLM(): WebLLMHook {
     setSpeed('')
 
     try {
+      if (cachedEngine) {
+        const previousEngine = cachedEngine
+        cachedEngine = null
+        cachedModelId = null
+        await previousEngine.unload()
+      }
       // Keep the large GPU runtime out of startup and cloud/local grammar flows.
       const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
       const engine = await CreateMLCEngine(resolvedModelId, {

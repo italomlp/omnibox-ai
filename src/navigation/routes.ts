@@ -1,4 +1,4 @@
-import { TOOL_REGISTRY_BY_ID } from '../tools/registry'
+import { TOOL_REGISTRY, TOOL_REGISTRY_BY_ID } from '../tools/registry'
 import type { ToolId } from '../tools/types'
 import { LIBRARY_SECTIONS, type LibrarySection, type RouteDescriptor, type RouteResolution } from './types'
 
@@ -7,8 +7,6 @@ export const WORKBENCH_ROUTE: RouteDescriptor = { view: 'workbench' }
 const NAVIGATION_PARAMETERS = ['view', 'tool', 'section', 'workspace'] as const
 
 const LEGACY_WORKSPACE_ROUTES = {
-  grammar: { view: 'tool', tool: 'grammar-tone' },
-  career: { view: 'tool', tool: 'career' },
   history: { view: 'library', section: 'runs' },
   settings: { view: 'system' },
 } as const satisfies Record<string, RouteDescriptor>
@@ -54,7 +52,10 @@ export const routesEqual = (left: RouteDescriptor, right: RouteDescriptor): bool
 export const routeForLegacyWorkspace = (workspace: unknown): RouteDescriptor | null => {
   if (typeof workspace !== 'string') return null
 
-  return LEGACY_WORKSPACE_ROUTES[workspace as keyof typeof LEGACY_WORKSPACE_ROUTES] ?? null
+  const tool = TOOL_REGISTRY.find((entry) => entry.legacyWorkspace === workspace)
+  if (tool) return { view: 'tool', tool: tool.id }
+  const route = LEGACY_WORKSPACE_ROUTES[workspace as keyof typeof LEGACY_WORKSPACE_ROUTES] ?? null
+  return route && isRouteDescriptor(route) ? route : null
 }
 
 interface CanonicalRouteParseResult {

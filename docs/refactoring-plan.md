@@ -4,6 +4,15 @@
 
 ---
 
+
+### Local models, privacy and interface — 2026-11-11
+
+Implementation is tracked in [the local models plan](plans/2026-11-11-local-models-privacy-ui.md). The catalog, automatic task recommendations, model dialog, privacy migration, local speech workflow, and workspace layout changes are implemented. Real model download, inference, and microphone testing remain environment-dependent and must be verified on supported hardware.
+
+### Build-time tool catalog — 2026-11-23
+
+Implemented the tool inventory, build-time enabled loaders, navigation and disabled-record behavior. See [the tool catalog plan](plans/2026-11-23-tool-catalog.md) for maintenance and verification.
+
 ## Current Status — 2026-07-13
 
 ### Validation update — 2026-10-20

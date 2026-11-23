@@ -49,7 +49,16 @@ export async function streamLLM(
     throw new Error(policyDecision.reason)
   }
 
+  if (policyContext.privacyMode && provider === 'ollama') {
+    let local = false
+    try {
+      const url = new URL(config.baseUrl || 'http://localhost:11434')
+      local = ['http:', 'https:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) && !url.username && !url.password
+    } catch { /* Invalid addresses are not local. */ }
+    if (!local) throw new Error('Privacy mode requires a localhost Ollama address.')
+  }
+
   const requestConfig = buildProviderRequest(provider, config, request)
   const parser = getChunkParser(provider)
-  return executeSSEStream(requestConfig, parser, callbacks, provider, signal)
+  return executeSSEStream(requestConfig, parser, callbacks, provider, signal, policyContext.privacyMode)
 }

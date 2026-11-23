@@ -1,12 +1,11 @@
 import React, { useId, useState } from 'react'
 import { Check, Code2, Copy, FileJson2, Loader2, WandSparkles } from 'lucide-react'
 import { ProviderSelector } from '../../components/shared/ProviderSelector'
-import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
-import { ErrorAlert } from '../../components/shared/ErrorAlert'
 import { InlineError } from '../../components/tooling/InlineError'
 import { SplitPane } from '../../components/tooling/SplitPane'
 import { ToolHeader } from '../../components/tooling/ToolHeader'
 import { ToolPage } from '../../components/tooling/ToolPage'
+import { InferenceStatus } from '../../components/tooling/InferenceStatus'
 import { useInference } from '../../hooks/useInference'
 
 type SourceMode = 'javascript' | 'json-example' | 'typescript-existing'
@@ -125,10 +124,8 @@ export const TypeJsdocToolPage: React.FC = () => {
     setSelectedModel,
     availableProviders,
     isProcessing,
-    errorMsg,
     runInference,
     abort,
-    webLLM,
   } = inference
 
   const [sourceMode, setSourceMode] = useState<SourceMode>('javascript')
@@ -236,15 +233,7 @@ export const TypeJsdocToolPage: React.FC = () => {
         }
       />
 
-      <WebGPULoadingOverlay
-        isLoading={activeProvider === 'webgpu' && webLLM.isLoading}
-        selectedModel={selectedModel}
-        loadPercent={webLLM.loadPercent}
-        speed={webLLM.speed}
-        loadProgress={webLLM.loadProgress}
-      />
-
-      <ErrorAlert errorMsg={errorMsg} activeProvider={activeProvider} onDismiss={inference.clearError} />
+      <InferenceStatus inference={inference} />
 
       <SplitPane
         left={

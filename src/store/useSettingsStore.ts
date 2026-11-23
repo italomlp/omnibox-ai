@@ -10,6 +10,7 @@ export interface SettingsState {
   baseUrls: Record<ProviderId, string>;
   selectedModels: Record<ProviderId, string>;
   privacyMode: boolean;
+  webLLMAuto: boolean;
   localQualityPolicy: LocalQualityPolicy;
   allowLocalModelEscalation: boolean;
   allowCloudFallback: boolean;
@@ -22,6 +23,7 @@ export interface SettingsState {
   setAllowLocalModelEscalation: (enabled: boolean) => void;
   setAllowCloudFallback: (enabled: boolean) => void;
   setShowRawModelDiagnostics: (enabled: boolean) => void;
+  setWebLLMAuto: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -37,7 +39,8 @@ export const useSettingsStore = create<SettingsState>()(
       },
       baseUrls: PROVIDER_DEFAULT_URLS,
       selectedModels: PROVIDER_DEFAULT_MODELS,
-      privacyMode: false,
+      privacyMode: true,
+      webLLMAuto: true,
       localQualityPolicy: 'auto',
       allowLocalModelEscalation: true,
       allowCloudFallback: false,
@@ -56,6 +59,7 @@ export const useSettingsStore = create<SettingsState>()(
       setSelectedModel: (provider, model) =>
         set((state) => ({
           selectedModels: { ...state.selectedModels, [provider]: model },
+          ...(provider === 'webgpu' ? { webLLMAuto: false } : {}),
         })),
 
       setPrivacyMode: (enabled) =>
@@ -74,9 +78,16 @@ export const useSettingsStore = create<SettingsState>()(
         })),
 
       setShowRawModelDiagnostics: (enabled) => set({ showRawModelDiagnostics: enabled }),
+      setWebLLMAuto: (enabled) => set({ webLLMAuto: enabled }),
     }),
     {
       name: 'omnibox-settings-v1',
+      version: 1,
+      migrate: (persistedState) => ({
+        ...(persistedState as Partial<SettingsState>),
+        privacyMode: true,
+        allowCloudFallback: false,
+      }) as SettingsState,
       merge: (persistedState, currentState) => {
         const nextState = {
           ...currentState,

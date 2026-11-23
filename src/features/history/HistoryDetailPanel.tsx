@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Copy, Check, ArrowRight } from 'lucide-react'
 import type { HistoryItem } from '../../db/db'
+import { canReloadLegacyWorkspace } from './legacyAvailability'
 
 interface CareerInputPayload {
   resume: string;
@@ -190,6 +191,8 @@ export const HistoryDetailPanel: React.FC<HistoryDetailPanelProps> = ({
             <button
               type="button"
               onClick={() => onReload(log)}
+              disabled={!canReloadLegacyWorkspace(log.workspaceId)}
+              title={!canReloadLegacyWorkspace(log.workspaceId) ? 'This tool is unavailable in this build' : undefined}
               className="button-primary control-standard w-full text-xs sm:w-auto"
               aria-label="Reload these inputs into the workspace"
             >

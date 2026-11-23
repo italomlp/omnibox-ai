@@ -1,564 +1,67 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Cpu, HardDrive, Sparkles } from 'lucide-react';
-import {
-  PROVIDER_DEFAULT_MODELS,
-  WEBLLM_MODEL_CONFIGS,
-  WEBLLM_MODEL_CONFIGS_BY_TIER,
-  WEBLLM_TASK_KEYS,
-  WEBLLM_TASK_LABELS,
-  WEBLLM_TASK_SUPPORT_LABELS,
-  WEBLLM_TIER_LABELS,
-  type WebLLMModelConfig,
-  type WebLLMModelTier,
-  type WebLLMTaskKey,
-} from '../../config/providers';
-
-const tierOrder: WebLLMModelTier[] = ['fast', 'balanced', 'quality'];
-
-const classNames = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
-
-const formatMemoryMB = (value: number): string => {
-  if (value >= 1000) {
-    const gb = value / 1000;
-    return `${Number.isInteger(gb) ? gb.toFixed(0) : gb.toFixed(1)} GB`;
-  }
-
-  return `${Math.round(value)} MB`;
-};
-
-const formatDownloadSize = (value: number): string => {
-  if (value >= 1000) {
-    const gb = value / 1000;
-    return `${Number.isInteger(gb) ? gb.toFixed(0) : gb.toFixed(1)} GB`;
-  }
-
-  return `${Math.round(value)} MB`;
-};
-
-const getTaskBadgeClass = (status: WebLLMModelConfig['taskSupport'][WebLLMTaskKey]): string => {
-  switch (status) {
-    case 'supported':
-      return 'theme-chip-success';
-    case 'best-effort':
-      return 'theme-chip-warning';
-    default:
-      return 'theme-chip-danger';
-  }
-};
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { PROVIDER_DEFAULT_MODELS, WEBLLM_MODEL_CONFIGS, WEBLLM_TASK_LABELS, WEBLLM_TASK_SUPPORT_LABELS, type WebLLMTaskKey } from '../../config/providers'
+import { useSettingsStore } from '../../store/useSettingsStore'
 
 export interface WebLLMModelPickerProps {
-  value: string;
-  onChange: (modelId: string) => void;
-  selectedTask?: WebLLMTaskKey | null;
-  workspaceActionLabel?: string;
-  blockedReason?: string;
-  disabled?: boolean;
-  className?: string;
-  label?: string;
-  menuMode?: 'flow' | 'portal';
+  value: string
+  onChange: (modelId: string) => void
+  selectedTask?: WebLLMTaskKey | null
+  workspaceActionLabel?: string
+  blockedReason?: string
+  disabled?: boolean
+  className?: string
+  label?: string
+  menuMode?: 'flow' | 'portal'
 }
 
-export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({
-  value,
-  onChange,
-  selectedTask = null,
-  workspaceActionLabel,
-  blockedReason,
-  disabled = false,
-  className,
-  label = 'WebLLM model',
-  menuMode = 'portal',
-}) => {
-  const pickerId = useId();
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const listboxRef = useRef<HTMLDivElement | null>(null);
-  const portalRef = useRef<HTMLDivElement | null>(null);
-  const optionRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const previousOpenRef = useRef(false);
-  const [portalStyle, setPortalStyle] = useState<React.CSSProperties | null>(null);
-
-  const selectedConfig = useMemo(() => {
-    return WEBLLM_MODEL_CONFIGS.find((config) => config.modelId === value) ??
-      WEBLLM_MODEL_CONFIGS.find((config) => config.modelId === PROVIDER_DEFAULT_MODELS.webgpu) ??
-      WEBLLM_MODEL_CONFIGS[0];
-  }, [value]);
-
-  const configsByTier = useMemo(
-    () => tierOrder.map((tier) => ({ tier, models: WEBLLM_MODEL_CONFIGS_BY_TIER[tier] })),
-    []
-  );
-
-  const flatConfigs = useMemo(
-    () => configsByTier.flatMap((group) => group.models),
-    [configsByTier]
-  );
-
-  const selectedTaskStatus = selectedTask ? selectedConfig.taskSupport[selectedTask] : null;
-  const selectedTaskLabel = selectedTask ? WEBLLM_TASK_LABELS[selectedTask] : null;
-
-  const selectedConfigIndex = useMemo(
-    () => flatConfigs.findIndex((config) => config.modelId === selectedConfig.modelId),
-    [flatConfigs, selectedConfig.modelId]
-  );
-
-  const activeConfig = flatConfigs[activeIndex] ?? selectedConfig;
-
-  const closePicker = () => {
-    setIsOpen(false);
-  };
-
-  const openPicker = () => {
-    if (disabled) return;
-    setActiveIndex(selectedConfigIndex >= 0 ? selectedConfigIndex : 0);
-    setIsOpen(true);
-  };
-
-  const selectModel = (modelId: string) => {
-    onChange(modelId);
-    setIsOpen(false);
-    requestAnimationFrame(() => triggerRef.current?.focus());
-  };
+export const WebLLMModelPicker: React.FC<WebLLMModelPickerProps> = ({ value, onChange, selectedTask, workspaceActionLabel, blockedReason, disabled, className, label = 'WebLLM model' }) => {
+  const [open, setOpen] = useState(false)
+  const auto = useSettingsStore((state) => state.webLLMAuto)
+  const setAuto = useSettingsStore((state) => state.setWebLLMAuto)
+  const [features, setFeatures] = useState<Set<string> | null>(null)
+  const [gpuUnavailable, setGpuUnavailable] = useState(false)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const selected = WEBLLM_MODEL_CONFIGS.find((model) => model.modelId === value) ?? WEBLLM_MODEL_CONFIGS.find((model) => model.modelId === PROVIDER_DEFAULT_MODELS.webgpu) ?? WEBLLM_MODEL_CONFIGS[0]
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!open) return
+    const dialog = dialogRef.current
+    const trigger = triggerRef.current
+    dialog?.showModal()
+    let cancelled = false
+    if (navigator.gpu) {
+      void navigator.gpu.requestAdapter().then((adapter) => {
+        if (!cancelled) {
+          setGpuUnavailable(!adapter)
+          if (adapter) setFeatures(new Set(adapter.features))
+        }
+      }).catch(() => { if (!cancelled) setGpuUnavailable(true) })
+    } else setGpuUnavailable(true)
+    return () => { cancelled = true; dialog?.close(); trigger?.focus() }
+  }, [open])
 
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (rootRef.current?.contains(target) || portalRef.current?.contains(target)) return;
-      setIsOpen(false);
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      requestAnimationFrame(() => listboxRef.current?.focus());
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (selectedConfigIndex >= 0) {
-      setActiveIndex(selectedConfigIndex);
-    }
-  }, [isOpen, selectedConfigIndex]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const option = optionRefs.current[activeIndex];
-    option?.scrollIntoView?.({ block: 'nearest' });
-  }, [activeIndex, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen || menuMode !== 'portal') {
-      setPortalStyle(null);
-      return;
-    }
-
-    let rafId = 0;
-    const updatePosition = () => {
-      const trigger = triggerRef.current;
-      const menu = portalRef.current;
-      if (!trigger || !menu) return;
-
-      const rect = trigger.getBoundingClientRect();
-      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const gap = 8;
-      const inset = 12;
-      const width = rect.width;
-      const maxHeightBelow = Math.max(160, viewportHeight - rect.bottom - gap - inset);
-      const maxHeightAbove = Math.max(160, rect.top - gap - inset);
-      const placeAbove = maxHeightBelow < 220 && maxHeightAbove > maxHeightBelow;
-      const left = Math.min(Math.max(rect.left, inset), Math.max(inset, viewportWidth - width - inset));
-
-      setPortalStyle({
-        position: 'fixed',
-        left,
-        width,
-        zIndex: 'var(--layer-popover40)',
-        ...(placeAbove
-          ? {
-              bottom: Math.max(inset, viewportHeight - rect.top + gap),
-              maxHeight: `calc(100dvh - ${Math.max(inset, viewportHeight - rect.top + gap)}px - ${inset}px)`,
-            }
-          : {
-              top: rect.bottom + gap,
-              maxHeight: `calc(100dvh - ${rect.bottom + gap}px - ${inset}px)`,
-            }),
-      });
-    };
-
-    const scheduleUpdate = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(updatePosition);
-    };
-
-    scheduleUpdate();
-    window.addEventListener('resize', scheduleUpdate);
-    window.addEventListener('scroll', scheduleUpdate, true);
-    window.visualViewport?.addEventListener('resize', scheduleUpdate);
-    window.visualViewport?.addEventListener('scroll', scheduleUpdate);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', scheduleUpdate);
-      window.removeEventListener('scroll', scheduleUpdate, true);
-      window.visualViewport?.removeEventListener('resize', scheduleUpdate);
-      window.visualViewport?.removeEventListener('scroll', scheduleUpdate);
-    };
-  }, [isOpen, menuMode]);
-
-  useEffect(() => {
-    if (previousOpenRef.current && !isOpen) {
-      triggerRef.current?.focus();
-    }
-    previousOpenRef.current = isOpen;
-  }, [isOpen]);
-
-  const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-
-    switch (event.key) {
-      case 'Enter':
-      case ' ':
-        event.preventDefault();
-        openPicker();
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        setActiveIndex(selectedConfigIndex >= 0 ? Math.min(selectedConfigIndex + 1, flatConfigs.length - 1) : 0);
-        setIsOpen(true);
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        setActiveIndex(selectedConfigIndex >= 0 ? Math.max(selectedConfigIndex - 1, 0) : flatConfigs.length - 1);
-        setIsOpen(true);
-        break;
-      default:
-        break;
-    }
-  };
-
-  const handleListboxKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!isOpen) return;
-
-    switch (event.key) {
-      case 'ArrowDown':
-      case 'ArrowRight':
-        event.preventDefault();
-        setActiveIndex((current) => (current + 1) % flatConfigs.length);
-        break;
-      case 'ArrowUp':
-      case 'ArrowLeft':
-        event.preventDefault();
-        setActiveIndex((current) => (current - 1 + flatConfigs.length) % flatConfigs.length);
-        break;
-      case 'Home':
-        event.preventDefault();
-        setActiveIndex(0);
-        break;
-      case 'End':
-        event.preventDefault();
-        setActiveIndex(flatConfigs.length - 1);
-        break;
-      case 'Enter':
-      case ' ':
-        event.preventDefault();
-        selectModel(activeConfig.modelId);
-        break;
-      case 'Escape':
-        event.preventDefault();
-        closePicker();
-        break;
-      default:
-        break;
-    }
-  };
-
-  const hardwareSummary = `${formatMemoryMB(selectedConfig.recommendedAvailableMemoryMB)} available GPU/shared memory · ${selectedConfig.recommendedSystemMemoryGB} GB RAM`;
-
-  const selectedTaskBlockMessage =
-    selectedTask && selectedTaskStatus === 'blocked'
-      ? blockedReason ??
-        `${selectedConfig.label} is blocked for ${workspaceActionLabel ?? selectedTaskLabel ?? 'this workspace action'}.`
-      : null;
-
-  const selectedTaskBestEffortMessage =
-    selectedTask && selectedTaskStatus === 'best-effort'
-      ? `${selectedConfig.label} can attempt ${workspaceActionLabel ?? selectedTaskLabel ?? 'this action'}, but output quality is not guaranteed.`
-      : null;
-
-  const menuContent = (
-        <div
-          ref={menuMode === 'portal' ? portalRef : undefined}
-          className={classNames(
-            menuMode === 'portal'
-              ? 'fixed left-0 top-0 layer-popover40 w-auto'
-              : 'absolute left-0 right-0 top-full layer-popover40 mt-2',
-            'theme-panel-strong rounded-2xl shadow-[0_25px_50px_-12px_rgba(255,255,255,0.08),0_0_1px_1px_rgba(255,255,255,0.1)] p-2 backdrop-blur'
-          )}
-      style={
-        menuMode === 'portal'
-          ? portalStyle
-            ? { ...portalStyle, visibility: 'visible' }
-            : { visibility: 'hidden' }
-          : undefined
-      }
-    >
-      <div
-        ref={listboxRef}
-        id={`${pickerId}-listbox`}
-        role="listbox"
-        aria-label={label}
-        aria-activedescendant={`${pickerId}-option-${flatConfigs[activeIndex]?.modelId ?? selectedConfig.modelId}`}
-        tabIndex={0}
-        onKeyDown={handleListboxKeyDown}
-        className="overflow-auto rounded-xl outline-none"
-        style={menuMode === 'portal' ? { maxHeight: portalStyle?.maxHeight ?? '31rem' } : { maxHeight: '31rem' }}
-      >
-        {configsByTier.map((group) => (
-          <div key={group.tier} className="space-y-2 p-1.5">
-            <div className="flex items-center gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
-              <span>{WEBLLM_TIER_LABELS[group.tier]}</span>
-              <span className="h-px flex-1 theme-divider" />
-            </div>
-
-            <div className="space-y-1.5">
-              {group.models.map((config) => {
-                const index = flatConfigs.findIndex((item) => item.modelId === config.modelId);
-                const isSelected = config.modelId === selectedConfig.modelId;
-                const isActive = index === activeIndex;
-
-                return (
-                  <div
-                    key={config.modelId}
-                    id={`${pickerId}-option-${config.modelId}`}
-                    ref={(node) => {
-                      optionRefs.current[index] = node;
-                    }}
-                    role="option"
-                    aria-selected={isSelected}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => selectModel(config.modelId)}
-                    className={classNames(
-                      'cursor-pointer rounded-xl border px-3 py-3 text-left transition-colors theme-panel',
-                      isActive
-                        ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)]'
-                        : 'hover:border-[color:var(--app-border-strong)] hover:bg-[color:var(--app-surface-hover)]',
-                      isSelected && 'ring-1 ring-inset ring-indigo-500/30'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <span className="min-w-0 truncate text-sm font-medium theme-text-strong">{config.label}</span>
-                          <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip">
-                            {config.family}
-                          </span>
-                          <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip">
-                            {config.parameterCount}
-                          </span>
-                        </div>
-
-                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] theme-text-faint">
-                          <span className="inline-flex items-center gap-1">
-                            <Cpu className="h-3 w-3" />
-                            {formatMemoryMB(config.recommendedAvailableMemoryMB)} available GPU/shared memory
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <HardDrive className="h-3 w-3" />
-                            {config.recommendedSystemMemoryGB} GB RAM
-                          </span>
-                        </p>
-                      </div>
-
-                      <div className="flex flex-shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wide theme-text-faint">
-                        {isSelected ? <Check className="h-3.5 w-3.5 theme-accent-text" /> : null}
-                        <span>{WEBLLM_TIER_LABELS[config.tier]}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {WEBLLM_TASK_KEYS.map((task) => {
-                        const status = config.taskSupport[task];
-                        return (
-                          <span
-                            key={task}
-                            className={classNames(
-                              'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                              getTaskBadgeClass(status)
-                            )}
-                          >
-                            {WEBLLM_TASK_LABELS[task]}: {WEBLLM_TASK_SUPPORT_LABELS[status]}
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] theme-text-faint">
-                      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 theme-chip">
-                        <Sparkles className="h-3 w-3" />
-                        Download {formatDownloadSize(config.downloadSizeMB)}
-                      </span>
-                      <span className="rounded-full border px-2 py-0.5 theme-chip">
-                        Context {config.contextWindow.toLocaleString()} tokens
-                      </span>
-                      <span className="rounded-full border px-2 py-0.5 theme-chip">
-                        Max input {config.maxRecommendedInputTokens.toLocaleString()} tokens
-                      </span>
-                      {config.requiredWebGpuFeatures?.map((feature) => (
-                        <span
-                          key={feature}
-                            className="rounded-full border px-2 py-0.5 theme-chip-warning"
-                          >
-                            Requires {feature}
-                          </span>
-                        ))}
-                      {config.warning ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 theme-chip-danger">
-                          <AlertTriangle className="h-3 w-3" />
-                          {config.warning}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  return (
-    <div ref={rootRef} className={classNames('relative w-full min-w-0 space-y-3', className)}>
-      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
-        <span>{label}</span>
-        <span className="rounded-full border px-2 py-0.5 theme-chip">
-          {WEBLLM_TIER_LABELS[selectedConfig.tier]}
-        </span>
-      </div>
-
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-controls={`${pickerId}-listbox`}
-        onClick={() => (isOpen ? closePicker() : openPicker())}
-        onKeyDown={handleTriggerKeyDown}
-        className={classNames(
-          'flex w-full items-start justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors theme-panel',
-          'hover:border-[color:var(--app-border-strong)] focus:outline-none focus-visible:border-[color:var(--app-accent)] focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent-soft)]',
-          disabled && 'cursor-not-allowed opacity-60'
-        )}
-      >
-        <div className="min-w-0 space-y-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="min-w-0 truncate text-sm font-semibold theme-text-strong">{selectedConfig.label}</span>
-            <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip theme-accent-text">
-              {WEBLLM_TIER_LABELS[selectedConfig.tier]}
-            </span>
-            {selectedConfig.warning ? (
-              <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide theme-chip-warning">
-                Warning
-              </span>
-            ) : null}
-          </div>
-
-          <p className="text-xs leading-relaxed theme-text-faint">{hardwareSummary}</p>
+  const fit = selectedTask ? selected.taskSupport[selectedTask] : null
+  return <div className={className}>
+    <button ref={triggerRef} type="button" disabled={disabled} aria-haspopup="dialog" onClick={() => setOpen(true)} className="theme-panel w-full rounded-xl border px-3 py-3 text-left text-sm theme-text-strong disabled:opacity-60">
+      <span className="font-semibold">{auto ? 'Automatic by task' : selected.label}</span><span className="ml-2 text-xs theme-text-faint">Change model</span>
+    </button>
+    {!auto && fit && <p className="mt-2 text-xs theme-text-faint">{workspaceActionLabel ?? WEBLLM_TASK_LABELS[selectedTask!]}: {WEBLLM_TASK_SUPPORT_LABELS[fit]}{fit === 'blocked' && blockedReason ? ` — ${blockedReason}` : ''}</p>}
+    {open && createPortal(<dialog ref={dialogRef} aria-label={label} onCancel={(event) => { event.preventDefault(); setOpen(false) }} onClick={(event) => { if (event.target === event.currentTarget) setOpen(false) }} className="theme-panel-strong m-auto max-h-[85dvh] w-[min(36rem,calc(100vw-2rem))] overflow-auto rounded-2xl border p-5 text-left backdrop:bg-black/70">
+      <div className="mb-4 flex items-center justify-between gap-4"><h2 className="text-lg font-semibold theme-text-strong">{label}</h2><button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-3 py-1 theme-text-strong">Close</button></div>
+      <p className="mb-3 text-xs theme-text-faint">Hardware fit is an estimate. Available GPU memory cannot be reliably measured by the browser.</p>
+      <button type="button" onClick={() => { setAuto(true); setOpen(false) }} aria-pressed={auto} className="theme-panel mb-2 w-full rounded-xl border p-3 text-left theme-text-strong">Automatic by task{auto ? ' · Selected' : ''}</button>
+      <div className="space-y-2">{WEBLLM_MODEL_CONFIGS.map((model) => {
+        const missing = features && model.requiredWebGpuFeatures?.filter((feature) => !features.has(feature))
+        return <div key={model.modelId} className="theme-panel rounded-xl border p-3">
+          <button type="button" onClick={() => { onChange(model.modelId); setAuto(false); setOpen(false) }} className="w-full text-left theme-text-strong" aria-pressed={!auto && model.modelId === selected.modelId}>
+            <span className="font-semibold">{model.label}</span>{!auto && model.modelId === selected.modelId ? ' · Selected' : ''}
+            <span className="mt-1 block text-xs theme-text-faint">Estimated download: {model.downloadSizeMB} MB · {gpuUnavailable ? 'WebGPU unavailable' : missing?.length ? `Unsupported: ${missing.join(', ')}` : 'Hardware fit unknown'}{selectedTask ? ` · ${WEBLLM_TASK_LABELS[selectedTask]}: ${WEBLLM_TASK_SUPPORT_LABELS[model.taskSupport[selectedTask]]}` : ''}</span>
+          </button>
+          <details className="mt-2 text-xs theme-text-faint"><summary className="cursor-pointer">Details</summary><p className="mt-1">Recommended GPU/shared memory: {model.recommendedAvailableMemoryMB} MB; system RAM: {model.recommendedSystemMemoryGB} GB. Context: {model.contextWindow} tokens. {model.warning}</p></details>
         </div>
-
-        <div className="mt-0.5 flex items-center gap-1 theme-text-faint">
-          {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </div>
-      </button>
-
-      {isOpen ? (menuMode === 'portal' ? createPortal(menuContent, document.body) : menuContent) : null}
-
-      <div className="rounded-xl border text-xs theme-panel-muted p-3">
-        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
-          <span>Model details</span>
-          {selectedTaskLabel ? (
-            <span className={classNames('rounded-full border px-2 py-0.5', getTaskBadgeClass(selectedTaskStatus ?? 'supported'))}>
-              {workspaceActionLabel ?? selectedTaskLabel}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Download size</p>
-            <p className="theme-text-strong">{formatDownloadSize(selectedConfig.downloadSizeMB)} actual model download.</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Memory guidance</p>
-            <p className="theme-text-strong">
-              Minimum {formatMemoryMB(selectedConfig.minimumAvailableMemoryMB)} available GPU/shared memory; recommended {formatMemoryMB(selectedConfig.recommendedAvailableMemoryMB)} and {selectedConfig.recommendedSystemMemoryGB} GB RAM.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Recommended use cases</p>
-            <p className="theme-text-strong">{selectedConfig.recommendedFor.join(', ')}</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Task fit</p>
-            <p className="theme-text-strong">
-              {selectedTaskLabel
-                ? selectedTaskStatus === 'blocked'
-                  ? selectedTaskBlockMessage
-                  : selectedTaskBestEffortMessage ?? `${selectedConfig.label} is a good fit for ${workspaceActionLabel ?? selectedTaskLabel}.`
-                : 'Choose a workspace action to see task compatibility guidance.'}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {WEBLLM_TASK_KEYS.map((task) => {
-            const status = selectedConfig.taskSupport[task];
-            const isSelectedTask = task === selectedTask;
-
-            return (
-              <span
-                key={task}
-                className={classNames(
-                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                  getTaskBadgeClass(status),
-                  isSelectedTask && 'ring-1 ring-inset ring-indigo-500/30'
-                )}
-              >
-                {WEBLLM_TASK_LABELS[task]}: {WEBLLM_TASK_SUPPORT_LABELS[status]}
-              </span>
-            );
-          })}
-          {selectedConfig.requiredWebGpuFeatures?.map((feature) => (
-            <span key={feature} className="rounded-full border px-2 py-0.5 theme-chip-warning text-[10px]">
-              Requires {feature}
-            </span>
-          ))}
-        </div>
-
-        {selectedConfig.warning ? (
-          <p className="theme-chip-warning mt-3 flex items-start gap-2 rounded-lg px-3 py-2">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-            <span>{selectedConfig.warning}</span>
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
-};
+      })}</div>
+    </dialog>, document.body)}
+  </div>
+}

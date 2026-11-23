@@ -7,6 +7,7 @@ interface ErrorAlertProps {
   activeProvider: ProviderId;
   title?: string;
   onDismiss?: () => void;
+  onUseOllama?: () => void;
 }
 
 export const ErrorAlert: React.FC<ErrorAlertProps> = ({
@@ -14,6 +15,7 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
   activeProvider,
   title = 'Execution Failed',
   onDismiss,
+  onUseOllama,
 }) => {
   if (!errorMsg) return null
 
@@ -23,6 +25,12 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
       <div className="space-y-1 flex-1">
         <p className="font-semibold">{title}</p>
         <p className="leading-relaxed">{errorMsg}</p>
+        {activeProvider === 'webgpu' && onUseOllama && (
+          <div className="mt-2 space-y-2">
+            <p>You can select a smaller WebLLM model, or switch to a locally running Ollama instance and retry.</p>
+            <button type="button" onClick={onUseOllama} className="rounded-lg border px-3 py-2 font-medium">Use local Ollama</button>
+          </div>
+        )}
         
         {activeProvider === 'webgpu' && errorMsg.includes('maxStorageBuffersPerShaderStage') && (
           <div className="mt-2 p-2.5 rounded theme-panel-muted space-y-1.5">

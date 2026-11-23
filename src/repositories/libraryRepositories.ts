@@ -31,6 +31,11 @@ export const runsRepository = {
   get: async (id: number): Promise<RunRecord | undefined> => db.runs.get(id),
   delete: async (id: number): Promise<void> => { await db.runs.delete(id) },
   clear: async (): Promise<void> => { await db.runs.clear() },
+  clearIfAllowed: async (allowed: (record: RunRecord) => boolean): Promise<boolean> => db.transaction('rw', db.runs, async () => {
+    if ((await db.runs.toArray()).some((record) => !allowed(record))) return false
+    await db.runs.clear()
+    return true
+  }),
 }
 
 export const documentRecordsRepository = {
@@ -74,4 +79,9 @@ export const artifactsRepository = {
   get: async (id: number): Promise<ArtifactRecord | undefined> => db.artifacts.get(id),
   delete: async (id: number): Promise<void> => { await db.artifacts.delete(id) },
   clear: async (): Promise<void> => { await db.artifacts.clear() },
+  clearIfAllowed: async (allowed: (record: ArtifactRecord) => boolean): Promise<boolean> => db.transaction('rw', db.artifacts, async () => {
+    if ((await db.artifacts.toArray()).some((record) => !allowed(record))) return false
+    await db.artifacts.clear()
+    return true
+  }),
 }

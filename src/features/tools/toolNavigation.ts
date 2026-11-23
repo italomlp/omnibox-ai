@@ -37,12 +37,13 @@ export const getRouteSubtitle = (route: RouteDescriptor): string => {
     case 'system':
       return 'Privacy and providers'
     case 'tool':
-      return getToolCategory(getTool(route.tool).categoryId).title
+      return getTool(route.tool) ? getToolCategory(getTool(route.tool)!.categoryId).title : 'Tool unavailable'
   }
 }
 
 export const getToolMetadata = (toolId: ToolId) => {
   const tool = getTool(toolId)
+  if (!tool) throw new Error(`Tool unavailable: ${toolId}`)
   const category = getToolCategory(tool.categoryId)
 
   return {

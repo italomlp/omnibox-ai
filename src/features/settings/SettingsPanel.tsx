@@ -76,7 +76,7 @@ export const SettingsPanel: React.FC = () => {
               </label>
             </div>
             <p className="text-xs leading-relaxed theme-text-muted">
-              When enabled, OmniBox AI cuts off all cloud gateway requests. All utilities are forced to execute locally inside your browser sandbox using WebGPU (WebLLM) or localhost Ollama.
+              Cloud requests are blocked. Local inference may use WebGPU or localhost Ollama. Starting an uncached model downloads its files from Hugging Face and WebLLM's model host; task inputs remain local.
             </p>
           </div>
         </div>
@@ -239,9 +239,6 @@ export const SettingsPanel: React.FC = () => {
                 {isWebGPU ? (
                   <div className="mb-3 space-y-3 rounded-xl theme-panel-muted p-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
-                        Preferred WebLLM model
-                      </label>
                       <WebLLMModelPicker
                         value={selectedModels.webgpu}
                         onChange={(model) => setSelectedModel('webgpu', model)}
@@ -251,12 +248,6 @@ export const SettingsPanel: React.FC = () => {
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Selected model ID</p>
-                      <p className="min-w-0 whitespace-normal break-words rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-canvas)] px-3 py-2 font-mono text-xs leading-relaxed theme-text-strong select-text">
-                        {_selectedWebLLMConfig?.modelId ?? PROVIDER_DEFAULT_MODELS.webgpu}
-                      </p>
-                    </div>
                   </div>
                 ) : null}
 

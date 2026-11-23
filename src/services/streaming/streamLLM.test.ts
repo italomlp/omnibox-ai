@@ -18,6 +18,19 @@ const responseFromBytes = (bytes: Uint8Array) => new Response(new ReadableStream
 afterEach(() => vi.unstubAllGlobals())
 
 describe('streamLLM execution boundary', () => {
+  it('blocks remote Ollama before fetch in privacy mode', async () => {
+    const fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    await expect(streamLLM('ollama', credentials, request, callbacks(), { privacyMode: true })).rejects.toThrow('Privacy mode requires a localhost Ollama address.')
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it.each(['http://localhost:11434', 'http://127.0.0.1:11434', 'http://[::1]:11434'])('allows %s with redirects disabled', async (baseUrl) => {
+    const fetcher = vi.fn().mockResolvedValue(responseFromBytes(new TextEncoder().encode('data: [DONE]\n\n')))
+    vi.stubGlobal('fetch', fetcher)
+    await streamLLM('ollama', { ...credentials, baseUrl }, request, callbacks(), { privacyMode: true })
+    expect(fetcher).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ redirect: 'error' }))
+  })
   it('preserves split UTF-8 events and completes with the accumulated output', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(responseFromBytes(new TextEncoder().encode(event('Olá ') + event('world') + 'data: [DONE]\n\n'))))
     const observer = callbacks()

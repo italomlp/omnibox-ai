@@ -27,6 +27,7 @@ export async function executeSSEStream(
   callbacks: StreamCallbacks,
   provider: ProviderId,
   signal?: AbortSignal,
+  blockRedirects = false,
 ): Promise<void> {
   let aborted = isAbortSignalTriggered(signal)
   const abortHandler = () => {
@@ -47,6 +48,7 @@ export async function executeSSEStream(
         headers: config.headers,
         body: config.body,
         signal,
+        redirect: blockRedirects ? 'error' : 'follow',
       })
     } catch (fetchError: unknown) {
       if (aborted || isAbortSignalTriggered(signal) || isAbortError(fetchError)) {

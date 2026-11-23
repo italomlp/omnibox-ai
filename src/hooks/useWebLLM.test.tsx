@@ -1,13 +1,14 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-const runtime = vi.hoisted(() => ({ loaded: false }))
+const runtime = vi.hoisted(() => ({ loaded: false, events: [] as string[] }))
 
 // The GPU boundary is simulated because jsdom cannot initialize a real GPU.
 vi.mock('@mlc-ai/web-llm', () => {
   runtime.loaded = true
   return {
     CreateMLCEngine: async (_model: string, options: { initProgressCallback: (report: { text: string }) => void }) => {
+      runtime.events.push(`load:${_model}`)
       options.initProgressCallback({ text: 'Loading model... 45.3% 5.43 MB/s' })
       return {
         chat: { completions: { create: async function* () {
@@ -15,6 +16,7 @@ vi.mock('@mlc-ai/web-llm', () => {
           yield { choices: [{ delta: { content: 'result' } }] }
         } } },
         interruptGenerate: () => undefined,
+        unload: async () => { runtime.events.push(`unload:${_model}`) },
       }
     },
   }
@@ -48,6 +50,15 @@ describe('WebLLM runtime loading', () => {
     expect(supported.result.current.loadPercent).toBe(100)
     expect(supported.result.current.speed).toBe('5.43 MB/s')
     expect(supported.result.current.isLoading).toBe(false)
+    Reflect.deleteProperty(navigator, 'gpu')
+  })
+  it('unloads the old model before allocating the next engine', async () => {
+    Object.defineProperty(navigator, 'gpu', { configurable: true, value: {} })
+    const supported = renderHook(() => useWebLLM())
+    runtime.events.length = 0
+    await act(async () => { await supported.result.current.loadModel('gemma-4-E2B-it-q4f32_1-MLC') })
+    expect(runtime.events).toEqual(['unload:Qwen2.5-1.5B-Instruct-q4f16_1-MLC', 'load:gemma-4-E2B-it-q4f32_1-MLC'])
+    supported.unmount()
     Reflect.deleteProperty(navigator, 'gpu')
   })
 })

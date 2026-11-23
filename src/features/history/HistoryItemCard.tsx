@@ -1,6 +1,7 @@
 import React from 'react'
 import { Sparkles, Briefcase, Trash2, ArrowRight } from 'lucide-react'
 import type { HistoryItem } from '../../db/db'
+import { canReloadLegacyWorkspace } from './legacyAvailability'
 
 interface HistoryItemCardProps {
   log: HistoryItem;
@@ -56,6 +57,7 @@ export const HistoryItemCard: React.FC<HistoryItemCardProps> = ({
         <button
           type="button"
           onClick={() => onDelete(log.id!)}
+          disabled={!canReloadLegacyWorkspace(log.workspaceId)}
           className="button-icon text-zinc-500 hover:text-red-400"
           title="Delete log entry"
           aria-label="Delete log entry"
@@ -67,6 +69,8 @@ export const HistoryItemCard: React.FC<HistoryItemCardProps> = ({
           <button
             type="button"
             onClick={() => onReload(log)}
+              disabled={!canReloadLegacyWorkspace(log.workspaceId)}
+              title={!canReloadLegacyWorkspace(log.workspaceId) ? 'This tool is unavailable in this build' : undefined}
             className="button-secondary px-2 text-[10px] text-zinc-400 hover:text-indigo-400"
             aria-label="Reload this entry into the workspace"
           >

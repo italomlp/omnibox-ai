@@ -1,13 +1,13 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Bot, CheckCircle2, Loader2, Mic, MicOff, Pause, Play, RotateCcw, Sparkles, Square, Volume2 } from 'lucide-react'
-import { ErrorAlert } from '../../components/shared/ErrorAlert'
 import { ProviderSelector } from '../../components/shared/ProviderSelector'
-import { WebGPULoadingOverlay } from '../../components/shared/WebGPULoadingOverlay'
 import { SplitPane } from '../../components/tooling/SplitPane'
 import { ToolHeader } from '../../components/tooling/ToolHeader'
 import { ToolPage } from '../../components/tooling/ToolPage'
+import { InferenceStatus } from '../../components/tooling/InferenceStatus'
 import { useInference } from '../../hooks/useInference'
 import { useSettingsStore } from '../../store/useSettingsStore'
+import { LocalTranscription } from './LocalTranscription'
 import {
   createBrowserSpeechRecognitionSession,
   getBrowserSpeechCapabilities,
@@ -50,7 +50,7 @@ const languageLabel = (locale: string): string => {
 export const SpeechStudioToolPage: React.FC = () => {
   const inference = useInference()
   const privacyMode = useSettingsStore((state) => state.privacyMode)
-  const { activeProvider, setActiveProvider, selectedModel, setSelectedModel, availableProviders, isProcessing, errorMsg, runInference, webLLM } = inference
+  const { activeProvider, setActiveProvider, selectedModel, setSelectedModel, availableProviders, isProcessing, runInference } = inference
 
   const synthesisTextId = useId()
   const synthesisLanguageId = useId()
@@ -74,11 +74,20 @@ export const SpeechStudioToolPage: React.FC = () => {
   const [finalTranscript, setFinalTranscript] = useState('')
   const [interimTranscript, setInterimTranscript] = useState('')
   const [cleanedTranscript, setCleanedTranscript] = useState('')
+  const [localTranscriptionActive, setLocalTranscriptionActive] = useState(false)
 
   const recognitionSessionRef = useRef<BrowserSpeechRecognitionSession | null>(null)
   const recognitionSessionIdRef = useRef(0)
   const recognitionBaseTranscriptRef = useRef('')
   const recognitionSlotsRef = useRef<Array<{ transcript: string; isFinal: boolean }>>([])
+
+  useEffect(() => useSettingsStore.subscribe((state, previous) => {
+    if (state.privacyMode && !previous.privacyMode) {
+      recognitionSessionIdRef.current += 1
+      recognitionSessionRef.current?.cancel()
+      recognitionSessionRef.current = null
+    }
+  }), [])
 
   const selectedLanguageVoices = useMemo(() => {
     if (selectedLanguage === 'auto') return voices
@@ -185,6 +194,12 @@ export const SpeechStudioToolPage: React.FC = () => {
       return
     }
 
+    if (privacyMode && !selectedVoice?.localService) {
+      setSpeechPlaybackState('error')
+      setSpeechError('Privacy Mode requires a voice reported by the browser as local.')
+      return
+    }
+
     const language = selectedLanguage === 'auto'
       ? selectedVoice?.lang ?? navigator.language ?? 'en-US'
       : selectedLanguage
@@ -273,6 +288,8 @@ export const SpeechStudioToolPage: React.FC = () => {
     clearRecognitionError()
     setCleanedTranscript('')
 
+    if (localTranscriptionActive) return
+
     if (privacyMode) {
       setRecognitionState('error')
       setRecognitionError('Browser speech recognition is disabled in Privacy Mode.')
@@ -287,8 +304,12 @@ export const SpeechStudioToolPage: React.FC = () => {
       return
     }
 
+    recognitionSessionIdRef.current += 1
+    const sessionId = recognitionSessionIdRef.current
     if (microphonePermission !== 'granted') {
+      setRecognitionState('requesting-permission')
       const permission = await requestBrowserMicrophonePermission()
+      if (recognitionSessionIdRef.current !== sessionId || useSettingsStore.getState().privacyMode) return
       setMicrophonePermission(permission)
       if (permission !== 'granted') {
         setRecognitionState('error')
@@ -298,8 +319,6 @@ export const SpeechStudioToolPage: React.FC = () => {
       }
     }
 
-    recognitionSessionIdRef.current += 1
-    const sessionId = recognitionSessionIdRef.current
     recognitionSessionRef.current?.cancel()
     recognitionSlotsRef.current = []
     recognitionBaseTranscriptRef.current = finalTranscript.trim()
@@ -350,6 +369,7 @@ export const SpeechStudioToolPage: React.FC = () => {
     recognitionSessionRef.current = session
 
     try {
+      if (recognitionSessionIdRef.current !== sessionId || useSettingsStore.getState().privacyMode) { session.cancel(); recognitionSessionRef.current = null; return }
       session.start()
     } catch {
       if (recognitionSessionIdRef.current !== sessionId) return
@@ -434,7 +454,7 @@ export const SpeechStudioToolPage: React.FC = () => {
       <ToolHeader
         eyebrow="Developer Workbench"
         title="Speech Studio"
-        description="Use browser speech synthesis and browser speech recognition with honest capability and privacy messaging. Browser recognition may rely on a browser or vendor service, so it is not treated as local-only."
+        description="Transcribe microphone recordings locally or use browser speech features when privacy settings allow them."
         icon={<Volume2 className="h-5 w-5 text-indigo-400" />}
         actions={(
           <ProviderSelector
@@ -447,15 +467,7 @@ export const SpeechStudioToolPage: React.FC = () => {
         )}
       />
 
-      <WebGPULoadingOverlay
-        isLoading={activeProvider === 'webgpu' && webLLM.isLoading}
-        selectedModel={selectedModel}
-        loadPercent={webLLM.loadPercent}
-        speed={webLLM.speed}
-        loadProgress={webLLM.loadProgress}
-      />
-
-      <ErrorAlert errorMsg={errorMsg} activeProvider={activeProvider} onDismiss={inference.clearError} title="Cleanup failed" />
+      <InferenceStatus inference={inference} title="Cleanup failed" />
 
       <section className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/60 p-4">
@@ -483,7 +495,7 @@ export const SpeechStudioToolPage: React.FC = () => {
             {privacyMode ? 'Privacy Mode is on' : 'Privacy Mode is off'}
           </div>
           <p className="mt-2 text-xs leading-6 text-zinc-400">
-            Browser recognition is disabled in Privacy Mode unless a verified local-only implementation exists.
+            Browser recognition is disabled in Privacy Mode. Local transcription remains available below.
           </p>
         </div>
       </section>
@@ -607,6 +619,12 @@ export const SpeechStudioToolPage: React.FC = () => {
               <p className="text-xs leading-relaxed text-zinc-400">Request microphone access, listen with interim and final transcript separation, and clean up the transcript only after it exists.</p>
             </div>
 
+            <LocalTranscription disabled={recognitionState !== 'idle' && recognitionState !== 'error'} onActiveChange={setLocalTranscriptionActive} onTranscript={(text) => {
+              const finalized = recognitionSlotsRef.current.filter((slot) => slot.isFinal && slot.transcript.trim()).map((slot) => slot.transcript.trim())
+              recognitionBaseTranscriptRef.current = [recognitionBaseTranscriptRef.current, ...finalized, text].filter(Boolean).join(' ')
+              recognitionSlotsRef.current = []
+              syncRecognitionTranscript()
+            }} />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Browser support</div>
@@ -632,7 +650,7 @@ export const SpeechStudioToolPage: React.FC = () => {
                 <MicOff className="h-4 w-4" />
                 Request microphone
               </button>
-              <button type="button" onClick={handleStartListening} className="inline-flex items-center gap-2 rounded-lg border border-emerald-700/60 bg-emerald-950/30 px-3 py-2 text-sm font-medium text-emerald-100 transition hover:border-emerald-500 hover:bg-emerald-950/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={!capabilities.recognition.supported || recognitionBlockedByPrivacy || recognitionState === 'listening' || recognitionState === 'requesting-permission'}>
+              <button type="button" onClick={handleStartListening} className="inline-flex items-center gap-2 rounded-lg border border-emerald-700/60 bg-emerald-950/30 px-3 py-2 text-sm font-medium text-emerald-100 transition hover:border-emerald-500 hover:bg-emerald-950/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={localTranscriptionActive || !capabilities.recognition.supported || recognitionBlockedByPrivacy || recognitionState === 'listening' || recognitionState === 'requesting-permission'}>
                 <Mic className="h-4 w-4" />
                 Start listening
               </button>

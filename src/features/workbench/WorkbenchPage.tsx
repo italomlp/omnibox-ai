@@ -14,7 +14,7 @@ interface WorkbenchPageProps {
   webGpuSupported: boolean | null
 }
 
-const quickStartTools = TOOL_REGISTRY.filter((tool) => tool.id === 'grammar-tone' || tool.id === 'career')
+const quickStartTools = TOOL_REGISTRY.filter((tool) => tool.quickStart)
 
 const resolveTool = (toolId: ToolId) => TOOL_REGISTRY_BY_ID[toolId]
 const isDefined = <T,>(value: T | undefined): value is T => value !== undefined

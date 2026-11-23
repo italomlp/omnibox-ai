@@ -374,6 +374,11 @@ input:checked + .theme-switch-track::after {
   scrollbar-gutter: stable;
 }
 
+.harper-diagnostic-textarea::placeholder {
+  color: var(--app-text-faint);
+  opacity: 1;
+}
+
 .harper-diagnostic-textarea::selection {
   background: rgb(99 102 241 / 0.38);
   color: transparent;

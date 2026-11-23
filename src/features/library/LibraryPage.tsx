@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, CircleAlert, FileText, FolderCode, LayoutGrid, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react'
 import type { LibrarySection, RouteDescriptor } from '../../navigation'
-import { getTool } from '../../tools/getTool'
-import { TOOL_REGISTRY_BY_ID } from '../../tools/registry'
+import { TOOL_CATALOG_BY_ID } from '../../tools/registry'
 import type { ArtifactRecord, DocumentRecord, RunRecord, RunStatus } from '../../db/db'
 import { artifactsRepository, documentRecordsRepository, runsRepository } from '../../repositories'
 
@@ -32,12 +31,14 @@ const safeJson = (value: unknown): string => {
   }
 }
 
-const resolveToolTitle = (toolId: string): string => TOOL_REGISTRY_BY_ID[toolId as keyof typeof TOOL_REGISTRY_BY_ID]?.title ?? titleCaseFromId(toolId)
+const isReadOnlyTool = (toolId: string): boolean => TOOL_CATALOG_BY_ID[toolId]?.enabled === false
+
+const resolveToolTitle = (toolId: string): string => TOOL_CATALOG_BY_ID[toolId]?.title ?? titleCaseFromId(toolId)
 
 const resolveActionTitle = (toolId: string, actionId?: string): string | undefined => {
   if (!actionId) return undefined
 
-  const tool = getTool(toolId as keyof typeof TOOL_REGISTRY_BY_ID)
+  const tool = TOOL_CATALOG_BY_ID[toolId]
   return tool?.actions?.find((action) => action.id === actionId)?.title ?? titleCaseFromId(actionId)
 }
 
@@ -103,7 +104,8 @@ const RecordShell: React.FC<{
   meta: React.ReactNode
   onSelect: () => void
   onDelete: () => void
-}> = ({ active, title, subtitle, meta, onSelect, onDelete }) => (
+  readOnly?: boolean
+}> = ({ active, title, subtitle, meta, onSelect, onDelete, readOnly = false }) => (
   <article className={`rounded-2xl border p-4 transition ${active ? 'border-indigo-700/70 bg-indigo-950/20' : 'border-zinc-800/70 bg-zinc-950/70'}`}>
     <button
       type="button"
@@ -128,6 +130,8 @@ const RecordShell: React.FC<{
       <button
         type="button"
         onClick={onDelete}
+        disabled={readOnly}
+        title={readOnly ? 'Tool is disabled; record is read-only' : undefined}
         className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 transition hover:border-rose-900/40 hover:bg-rose-950/20 hover:text-rose-200"
         aria-label="Delete this record"
       >
@@ -155,6 +159,8 @@ const RunDetail: React.FC<{
         <button
           type="button"
           onClick={onDelete}
+          disabled={isReadOnlyTool(run.toolId)}
+          title={isReadOnlyTool(run.toolId) ? 'Tool is disabled; record is read-only' : undefined}
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:border-rose-900/40 hover:bg-rose-950/20 hover:text-rose-200"
         >
           <Trash2 className="h-4 w-4" /> Delete run
@@ -241,6 +247,8 @@ const ArtifactDetail: React.FC<{
       <button
         type="button"
         onClick={onDelete}
+        disabled={isReadOnlyTool(artifact.toolId)}
+        title={isReadOnlyTool(artifact.toolId) ? 'Tool is disabled; record is read-only' : undefined}
         className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:border-rose-900/40 hover:bg-rose-950/20 hover:text-rose-200"
       >
         <Trash2 className="h-4 w-4" /> Delete artifact
@@ -265,6 +273,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
   const [runs, setRuns] = useState<RunRecord[]>([])
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [artifacts, setArtifacts] = useState<ArtifactRecord[]>([])
+  const [recordsLoaded, setRecordsLoaded] = useState(false)
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null)
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
   const [selectedArtifactId, setSelectedArtifactId] = useState<number | null>(null)
@@ -283,6 +292,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
     setRuns(nextRuns)
     setDocuments(nextDocuments)
     setArtifacts(nextArtifacts)
+    setRecordsLoaded(true)
   }
 
   useEffect(() => {
@@ -342,6 +352,8 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
   const selectedArtifact = artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts[0] ?? null
 
   const confirmAndClear = async (scope: LibrarySection) => {
+    if (!recordsLoaded) return
+    if ((scope === 'runs' && runs.some((run) => isReadOnlyTool(run.toolId))) || (scope === 'artifacts' && artifacts.some((artifact) => isReadOnlyTool(artifact.toolId)))) return
     const labels: Record<LibrarySection, string> = {
       runs: 'canonical runs collection',
       documents: 'canonical documents collection',
@@ -354,7 +366,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
     }
 
     if (scope === 'runs') {
-      await runsRepository.clear()
+      if (!await runsRepository.clearIfAllowed((run) => !isReadOnlyTool(run.toolId))) { await loadRecords(); return }
       setRuns([])
       setSelectedRunId(null)
       return
@@ -368,13 +380,14 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
     }
 
     if (scope === 'artifacts') {
-      await artifactsRepository.clear()
+      if (!await artifactsRepository.clearIfAllowed((artifact) => !isReadOnlyTool(artifact.toolId))) { await loadRecords(); return }
       setArtifacts([])
       setSelectedArtifactId(null)
     }
   }
 
   const deleteRun = async (runId: number) => {
+    if (runs.some((run) => run.id === runId && isReadOnlyTool(run.toolId))) return
     if (!window.confirm('Delete this run record? This only removes the selected canonical run.')) return
     await runsRepository.delete(runId)
     setRuns((current) => current.filter((run) => run.id !== runId))
@@ -389,6 +402,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
   }
 
   const deleteArtifact = async (artifactId: number) => {
+    if (artifacts.some((artifact) => artifact.id === artifactId && isReadOnlyTool(artifact.toolId))) return
     if (!window.confirm('Delete this artifact record? This only removes the selected canonical artifact.')) return
     await artifactsRepository.delete(artifactId)
     setArtifacts((current) => current.filter((artifact) => artifact.id !== artifactId))
@@ -407,6 +421,8 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
         <button
           type="button"
           onClick={() => void confirmAndClear('runs')}
+          disabled={!recordsLoaded || runs.some((run) => isReadOnlyTool(run.toolId))}
+          title={runs.some((run) => isReadOnlyTool(run.toolId)) ? 'Disabled-tool records are read-only' : undefined}
           className="inline-flex items-center gap-2 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-200 transition hover:border-rose-800 hover:bg-rose-950/40"
         >
           <Trash2 className="h-4 w-4" /> Clear runs
@@ -456,6 +472,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
                 meta={<span className="font-mono">{formatTimestamp(run.createdAt)} · {run.status}</span>}
                 onSelect={() => setSelectedRunId(run.id ?? null)}
                 onDelete={() => void deleteRun(run.id!)}
+                readOnly={isReadOnlyTool(run.toolId)}
               />
             ))}
           </div>
@@ -534,6 +551,8 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
         <button
           type="button"
           onClick={() => void confirmAndClear('artifacts')}
+          disabled={!recordsLoaded || artifacts.some((artifact) => isReadOnlyTool(artifact.toolId))}
+          title={artifacts.some((artifact) => isReadOnlyTool(artifact.toolId)) ? 'Disabled-tool records are read-only' : undefined}
           className="inline-flex items-center gap-2 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-200 transition hover:border-rose-800 hover:bg-rose-950/40"
         >
           <Trash2 className="h-4 w-4" /> Clear artifacts
@@ -552,6 +571,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ section, onNavigate })
                 meta={<span className="font-mono">{formatTimestamp(artifact.createdAt)}</span>}
                 onSelect={() => setSelectedArtifactId(artifact.id ?? null)}
                 onDelete={() => void deleteArtifact(artifact.id!)}
+                readOnly={isReadOnlyTool(artifact.toolId)}
               />
             ))}
           </div>

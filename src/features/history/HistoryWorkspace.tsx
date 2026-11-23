@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { History, Inbox } from 'lucide-react'
 import { db, type HistoryItem } from '../../db/db'
-import { isWorkspaceId, type WorkspaceId } from '../../store/useUIStore'
+import type { WorkspaceId } from '../../store/useUIStore'
+import { canReloadLegacyWorkspace } from './legacyAvailability'
 import { HistoryList } from './HistoryList'
 import { HistoryItemCard } from './HistoryItemCard'
 import { HistoryDetailPanel } from './HistoryDetailPanel'
@@ -84,6 +85,8 @@ export const HistoryWorkspace: React.FC<HistoryWorkspaceProps> = ({ onNavigateWo
   }, [])
 
   const handleDelete = async (id: number) => {
+    const record = logs.find((log) => log.id === id)
+    if (!record || !canReloadLegacyWorkspace(record.workspaceId)) return
     if (!confirm('Are you sure you want to permanently delete this history entry?')) return
     try {
       await db.history.delete(id)
@@ -97,6 +100,7 @@ export const HistoryWorkspace: React.FC<HistoryWorkspaceProps> = ({ onNavigateWo
   }
 
   const handleClearAll = async () => {
+    if (logs.some((log) => !canReloadLegacyWorkspace(log.workspaceId))) return
     if (!confirm('WARNING: This will permanently wipe your entire prompt activity history logs across all workspaces. Are you sure?')) return
     try {
       await db.history.clear()
@@ -108,6 +112,7 @@ export const HistoryWorkspace: React.FC<HistoryWorkspaceProps> = ({ onNavigateWo
   }
 
   const handleReload = (log: HistoryItem) => {
+    if (!canReloadLegacyWorkspace(log.workspaceId)) return
     // Write reload inputs to localStorage to decouple the workspace states
     if (log.workspaceId === 'career') {
       localStorage.setItem('omnibox-career-reload', buildCareerReloadPayload(log.input))
@@ -115,12 +120,7 @@ export const HistoryWorkspace: React.FC<HistoryWorkspaceProps> = ({ onNavigateWo
       localStorage.setItem('omnibox-grammar-reload', stringifyHistoryInput(log.input))
     }
 
-    // Redirect workspace view
-    if (isWorkspaceId(log.workspaceId)) {
-      onNavigateWorkspace(log.workspaceId)
-    } else {
-      onNavigateWorkspace('grammar')
-    }
+    onNavigateWorkspace(log.workspaceId === 'career' ? 'career' : 'grammar')
   }
 
   // Filter & Sort Computations
@@ -177,6 +177,7 @@ export const HistoryWorkspace: React.FC<HistoryWorkspaceProps> = ({ onNavigateWo
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
         onClearHistory={handleClearAll}
+        clearDisabled={logs.some((log) => !canReloadLegacyWorkspace(log.workspaceId))}
       />
 
       {/* History Grid */}

@@ -9,6 +9,8 @@ This root file is the quick entry point for agents modifying OmniBox AI. Read th
 - Do not install OpenAI, Anthropic, Gemini, or OpenRouter SDK packages. Cloud gateways use browser `fetch` under `src/services/streaming/`.
 - Preserve the global `privacyMode` guard: when enabled, block cloud requests and avoid silent third-party network loading.
 - Resolve lint warnings before building.
+- Name new branches by purpose using prefixes such as `feat/`, `fix/`, `docs/`, or `refactor/`; do not use an agent name as the prefix.
+- Use Conventional Commits for commit messages; keep subject lines at most 90 characters.
 
 ## Topic Guides
 - Architecture: [.agents/architecture.md](.agents/architecture.md)
